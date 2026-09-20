@@ -1,0 +1,89 @@
+I want to make a website for a companion in my tv show.
+
+the tv show is about a consulting competition. There will be many rounds of games. Every round there will be differrent games.
+
+There will be 2 users
+1. Admin : In charges with giving the points to the users and decided to add or remove any point in the round
+2. Participants : Leaderboard view and Game Preview
+
+Games & Round
+
+Round 1 : The Gauntlet
+There will be 8 round in this game (7 normal round, per round is 3 questions and 1 crisis round = 1 question only)
+Round Name : 
+1 - BUSINESS ANALYST (each questions = 20 points)
+2 - ASSOCIATE CONSULTANT (each questions = 30 points)
+3 - CONSULTANT (each questions = 45 points)
+4 - SENIOR CONSULTANT (each questions = 65 points)
+5 - MANAGER (each questions = 90 points)
+6 - PRINCIPAL (each questions = 120 points)
+CRISIS ROUND (each questions = 130 points)
+7 - PARTNER (each questions = 170 points)
+
+
+Participants (user) :
+1. See the leaderboard (references from kahoot), the leaderboard will show the rank, participants name, university, and score.
+2. For around 30 seconds, participants will be show a questions box with timer (timer display second : millisecond ex: 29:59)
+2. After 30 seconds, participants will be given another 30 seconds for them to read and answer. There will be multiple choices A B C D E F. The interface will show Timer, Questions and Answer. The participant will answer it manually and scoring will be manually added by the admin
+
+
+admin : 
+1. Add score point manually, the template will be
+Round Name | Name | Total Score
+make sure there is a searh bar (big) for searching names with already shows the name without entering it
+
+Round 2 : Capital Conquest
+1. Participants : Input answer (in Int, for this lets say the correct answer is 1467), if correct -> Pop up with celebrations and animation saying "You made it to the next round!" After inputing, the pop up automaticly close in 10 seconds or can manualy close
+2. Admin : Can make participants pass or failed
+3. Interface : Show all 26 participants (but fade), when they answer the correct answer they will be highlighted and says "Passed" if not they will be "Failed"
+
+Round 3 : Rootmaster
+1. Main Interface : Countdown (Mins:Second:MilSec)
+
+Round 4 : Pressure Chamber
+1. Main Interface : 
+- Spin wheel (9 Names)
+- Timer Countdown 
+2. Admin : Added the name to the spin wheel, Set Countdown
+NAME | SCORE
+
+Round 5 : Executive Pitch
+1. Main Interface : 
+- Spin Wheel (5 names)
+- Timer Countdown
+- Leaderboard (1 2 3 will be more highlighted, make it more fancy because this will be the last round and reveal the main winner)
+
+2. Admin : Input the score, reset timer and end the game
+NAME | SCORE
+
+This are the name for the participants and Univ
+Nama	Universitas
+Rifqi Syarifuddin Yasykur	Institut Teknologi Sepuluh Nopember
+Mohammad Ali Fikri	Universitas Malang
+Cyka Srihana Humaera	Universitas Brawijaya
+Alvyan Ananta Asis	Universitas Airlangga
+Mohammad Hilmi Hidayatullah	Institut Teknologi Sepuluh Nopember
+Diva Salsabilla	Politeknik Negeri Malang
+Muchamad Yafis	Universitas Malang
+Fachri Fabian	Universitas Pembangunan Nasional “Veteran” Jawa Timur
+Nafi Satul Fuadhah	Universitas Brawijaya
+Ngurah Oka	Universitas Brawijaya
+Rachelle Hasiane	Universitas Brawijaya
+Ihsan Dianta	Institut Teknologi Sepuluh Nopember
+Ahmad Reva Dany Fawwaz	UNAIR
+M. Fajar Akbar Nugeraha	Universitas Brawijaya
+Surya Rahmat Fatahillah Politeknik Negeri Malang
+Naufal Aryasatya	Universitas Brawijaya
+Theresia Rosma Exaudi	Universitas Brawijaya
+Abdullah Shamil Basayev	Politeknik Negeri Malang
+Jesslyn Callista	Universitas Brawijaya
+Nindya Aliyah Maulidina	Universitas Pembangunan Nasional “Veteran” Jawa Timur
+Sharlyf Shaquille Syani	Politeknik Negeri Malang
+Rexelnino Rajendra	Universitas Brawijaya
+Hanindita Fernanda Elsharini	Universitas Brawijaya
+	
+Kelvin William	Universitas Ciputra
+Achmad Muchtarom Achsany	Universitas Brawijaya
+
+Make sure the element and style of the website is heavily inspired and follow the style of this web 
+180dcub.com
