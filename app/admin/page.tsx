@@ -17,10 +17,17 @@ export default function AdminPage() {
       if (next.round1TimerRunning && next.round1TimeRemainingMs > 0) {
         next.round1TimeRemainingMs = Math.max(0, next.round1TimeRemainingMs - 100);
         changed = true;
-        if (next.round1TimeRemainingMs === 0 && next.round1Phase === "preview") {
-          next.round1Phase = "answering";
+        if (
+          next.round1TimeRemainingMs === 0 &&
+          (next.round1Phase === "question_timer" || next.round1Phase === "preview" || next.round1Phase === "idle")
+        ) {
+          next.round1Phase = "question_options";
           next.round1TimeRemainingMs = 30000;
-        } else if (next.round1TimeRemainingMs === 0 && next.round1Phase === "answering") {
+          next.round1TimerRunning = true;
+        } else if (
+          next.round1TimeRemainingMs === 0 &&
+          (next.round1Phase === "question_options" || next.round1Phase === "answering")
+        ) {
           next.round1TimerRunning = false;
         }
       }
@@ -46,6 +53,14 @@ export default function AdminPage() {
         changed = true;
         if (next.round5TimeRemainingMs === 0) {
           next.round5TimerRunning = false;
+        }
+      }
+
+      if (next.round6TimerRunning && (next.round6TimeRemainingMs || 0) > 0) {
+        next.round6TimeRemainingMs = Math.max(0, (next.round6TimeRemainingMs || 0) - 100);
+        changed = true;
+        if (next.round6TimeRemainingMs === 0) {
+          next.round6TimerRunning = false;
         }
       }
 

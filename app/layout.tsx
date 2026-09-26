@@ -18,7 +18,11 @@ export const metadata: Metadata = {
     "Official TV Show Companion & Live Competition Platform for 180 Degrees Consulting Universitas Brawijaya",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"

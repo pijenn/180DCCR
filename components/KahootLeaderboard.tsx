@@ -67,14 +67,15 @@ export function KahootLeaderboard({
 
       {/* Top 3 Podium Cards (Kahoot Style Highlights) */}
       {highlightTop && displayList.length >= 3 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          {/* Rank 2 */}
-          <div className="order-2 md:order-1 glass-card p-4 rounded-2xl border-slate-400/30 bg-gradient-to-b from-white/[0.04] to-transparent flex flex-col items-center text-center relative overflow-hidden">
-            <div className="absolute top-2 right-2 text-slate-300 font-bold text-xs px-2 py-0.5 rounded-full bg-slate-400/20 border border-slate-400/30">
-              2nd Place
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end pt-2">
+          {/* Rank 2 (Silver) */}
+          <div className="order-2 md:order-1 glass-card p-5 rounded-3xl border-slate-300/40 bg-gradient-to-t from-slate-900/90 via-slate-800/40 to-slate-700/20 flex flex-col items-center text-center relative overflow-hidden animate-podium-2 shadow-[0_10px_30px_rgba(203,213,225,0.15)]">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent opacity-75" />
+            <div className="text-slate-200 font-extrabold text-xs px-3 py-1 rounded-full bg-slate-400/20 border border-slate-400/30 mb-3 shadow-inner flex items-center gap-1">
+              🥈 2nd Place
             </div>
             <div className="relative mb-3 mt-1">
-              <div className="w-16 h-16 rounded-full ring-2 ring-slate-400/50 overflow-hidden relative shadow-lg">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full ring-4 ring-slate-300/60 overflow-hidden relative shadow-[0_0_20px_rgba(203,213,225,0.3)]">
                 <Image
                   src={displayList[1].avatar || "/participants/khal.webp"}
                   alt={displayList[1].name}
@@ -86,20 +87,23 @@ export function KahootLeaderboard({
                 {getRankBadge(2)}
               </div>
             </div>
-            <h3 className="font-bold text-sm text-white line-clamp-1">{displayList[1].name}</h3>
-            <p className="text-xs text-white/50 line-clamp-1 mb-2">{displayList[1].university}</p>
-            <div className="mt-auto px-4 py-1.5 rounded-xl bg-white/5 border border-white/10 font-extrabold text-[#8cc63f] text-base">
+            <h3 className="font-extrabold text-sm sm:text-base text-white line-clamp-1">{displayList[1].name}</h3>
+            <p className="text-xs text-white/50 line-clamp-1 mb-3">{displayList[1].university}</p>
+            <div className="mt-auto px-4 py-2 rounded-xl bg-white/10 border border-white/15 font-black text-slate-200 text-base shadow-sm">
               {displayList[1].score.toLocaleString()} <span className="text-[10px] text-white/40 uppercase">pts</span>
             </div>
           </div>
 
           {/* Rank 1 (Gold Champion) */}
-          <div className="order-1 md:order-2 glass-card p-5 rounded-2xl border-[#8cc63f]/40 bg-gradient-to-b from-[#8cc63f]/10 via-white/[0.05] to-transparent flex flex-col items-center text-center relative overflow-hidden shadow-[0_0_30px_rgba(140,198,63,0.15)]">
-            <div className="absolute top-2 right-2 text-yellow-300 font-extrabold text-xs px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 animate-pulse">
-              👑 Leader
+          <div className="order-1 md:order-2 glass-card p-6 sm:p-7 rounded-3xl border-2 border-[#8cc63f] bg-gradient-to-t from-[#005a36]/90 via-[#8cc63f]/20 to-amber-500/20 flex flex-col items-center text-center relative overflow-hidden animate-podium-1 shadow-[0_0_50px_rgba(140,198,63,0.35)] z-10 scale-105">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl animate-crown select-none pointer-events-none">
+              👑
+            </div>
+            <div className="text-black font-black text-xs px-4 py-1 rounded-full bg-[#8cc63f] shadow-[0_0_15px_rgba(140,198,63,0.6)] mb-3 tracking-wider font-mono animate-pulse">
+              🏆 LEADER #1
             </div>
             <div className="relative mb-3 mt-1">
-              <div className="w-20 h-20 rounded-full ring-4 ring-[#8cc63f] overflow-hidden relative shadow-[0_0_20px_rgba(140,198,63,0.4)]">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full ring-4 ring-[#8cc63f] overflow-hidden relative shadow-[0_0_35px_rgba(140,198,63,0.6)]">
                 <Image
                   src={displayList[0].avatar || "/participants/khal.webp"}
                   alt={displayList[0].name}
@@ -111,20 +115,21 @@ export function KahootLeaderboard({
                 {getRankBadge(1)}
               </div>
             </div>
-            <h3 className="font-extrabold text-base text-white line-clamp-1">{displayList[0].name}</h3>
-            <p className="text-xs text-[#8cc63f]/80 line-clamp-1 mb-2 font-medium">{displayList[0].university}</p>
-            <div className="mt-auto px-5 py-2 rounded-xl bg-[#8cc63f]/20 border border-[#8cc63f]/40 font-black text-white text-lg shadow-[0_0_15px_rgba(140,198,63,0.3)]">
-              {displayList[0].score.toLocaleString()} <span className="text-xs text-[#8cc63f] uppercase">pts</span>
+            <h3 className="font-black text-base sm:text-lg text-white line-clamp-1">{displayList[0].name}</h3>
+            <p className="text-xs text-[#8cc63f]/90 line-clamp-1 mb-3 font-semibold">{displayList[0].university}</p>
+            <div className="mt-auto px-5 py-2.5 rounded-2xl bg-[#8cc63f] text-black font-black text-lg sm:text-xl shadow-[0_0_20px_rgba(140,198,63,0.5)]">
+              {displayList[0].score.toLocaleString()} <span className="text-xs text-black/70 uppercase">pts</span>
             </div>
           </div>
 
-          {/* Rank 3 */}
-          <div className="order-3 glass-card p-4 rounded-2xl border-amber-600/30 bg-gradient-to-b from-white/[0.04] to-transparent flex flex-col items-center text-center relative overflow-hidden">
-            <div className="absolute top-2 right-2 text-amber-400 font-bold text-xs px-2 py-0.5 rounded-full bg-amber-600/20 border border-amber-600/30">
-              3rd Place
+          {/* Rank 3 (Bronze) */}
+          <div className="order-3 glass-card p-5 rounded-3xl border-amber-600/40 bg-gradient-to-t from-amber-950/90 via-amber-900/40 to-amber-800/20 flex flex-col items-center text-center relative overflow-hidden animate-podium-3 shadow-[0_10px_30px_rgba(217,119,6,0.15)]">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-75" />
+            <div className="text-amber-300 font-extrabold text-xs px-3 py-1 rounded-full bg-amber-600/20 border border-amber-500/30 mb-3 shadow-inner flex items-center gap-1">
+              🥉 3rd Place
             </div>
             <div className="relative mb-3 mt-1">
-              <div className="w-16 h-16 rounded-full ring-2 ring-amber-600/50 overflow-hidden relative shadow-lg">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full ring-4 ring-amber-600/60 overflow-hidden relative shadow-[0_0_20px_rgba(217,119,6,0.3)]">
                 <Image
                   src={displayList[2].avatar || "/participants/khal.webp"}
                   alt={displayList[2].name}
@@ -136,30 +141,31 @@ export function KahootLeaderboard({
                 {getRankBadge(3)}
               </div>
             </div>
-            <h3 className="font-bold text-sm text-white line-clamp-1">{displayList[2].name}</h3>
-            <p className="text-xs text-white/50 line-clamp-1 mb-2">{displayList[2].university}</p>
-            <div className="mt-auto px-4 py-1.5 rounded-xl bg-white/5 border border-white/10 font-extrabold text-[#8cc63f] text-base">
+            <h3 className="font-extrabold text-sm sm:text-base text-white line-clamp-1">{displayList[2].name}</h3>
+            <p className="text-xs text-white/50 line-clamp-1 mb-3">{displayList[2].university}</p>
+            <div className="mt-auto px-4 py-2 rounded-xl bg-white/10 border border-white/15 font-black text-amber-300 text-base shadow-sm">
               {displayList[2].score.toLocaleString()} <span className="text-[10px] text-white/40 uppercase">pts</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Full Leaderboard List */}
+      {/* Full Leaderboard List with Staggered Cascading Animation */}
       <div className="space-y-2">
-        {displayList.map((participant) => {
+        {displayList.map((participant, idx) => {
           const isTop3 = participant.rank <= 3;
           return (
             <div
               key={participant.id}
-              className={`glass-card p-3 sm:p-4 rounded-xl flex items-center justify-between gap-3 sm:gap-4 transition-all ${
+              style={{ animationDelay: `${Math.min(2.2, 1.2 + idx * 0.04)}s` }}
+              className={`glass-card p-3 sm:p-4 rounded-2xl flex items-center justify-between gap-3 sm:gap-4 transition-all animate-cascade-row group ${
                 participant.rank === 1
-                  ? "border-[#8cc63f]/40 bg-[#8cc63f]/[0.06]"
+                  ? "border-[#8cc63f]/40 bg-[#8cc63f]/[0.08]"
                   : participant.rank === 2
                   ? "border-slate-400/30 bg-white/[0.04]"
                   : participant.rank === 3
                   ? "border-amber-600/30 bg-white/[0.03]"
-                  : "border-white/5 hover:border-white/20"
+                  : "border-white/5 hover:border-white/20 hover:bg-white/[0.03]"
               }`}
             >
               <div className="flex items-center gap-3 sm:gap-4 min-w-0">

@@ -15,6 +15,7 @@ interface Round2CapitalConquestProps {
   onParticipantPass?: (participantId: string) => void;
   onParticipantFail?: (participantId: string) => void;
   isAdmin?: boolean;
+  showInputForm?: boolean;
 }
 
 export function Round2CapitalConquest({
@@ -24,6 +25,7 @@ export function Round2CapitalConquest({
   onParticipantPass,
   onParticipantFail,
   isAdmin = false,
+  showInputForm = false,
 }: Round2CapitalConquestProps) {
   const [inputVal, setInputVal] = useState("");
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>(participants[0]?.id || "");
@@ -113,21 +115,21 @@ export function Round2CapitalConquest({
                 Round 2
               </span>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white/70">
-                Qualification Round
+                Stage Contestant Arena
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white mt-2 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-white mt-2 tracking-tight uppercase">
               Capital Conquest
             </h1>
             <p className="text-sm text-white/60 mt-1 max-w-xl">
-              Calculate the required target valuation capital (in integer). Correct submission immediately unlocks qualification to the subsequent round.
+              Tampilan kondisi seluruh peserta secara langsung. Peserta melakukan submission kalkulasi valuasi integer di halaman khusus portal peserta.
             </p>
           </div>
 
           {/* Stats Badges */}
           <div className="flex items-center gap-3">
             <div className="glass-card px-4 py-2.5 rounded-xl border-emerald-500/30 text-center">
-              <div className="text-xs text-white/50 uppercase font-bold">Passed</div>
+              <div className="text-xs text-white/50 uppercase font-bold">Passed (Lolos)</div>
               <div className="text-2xl font-black text-emerald-400">{passedCount}</div>
             </div>
             <div className="glass-card px-4 py-2.5 rounded-xl border-red-500/30 text-center">
@@ -135,69 +137,90 @@ export function Round2CapitalConquest({
               <div className="text-2xl font-black text-red-400">{failedCount}</div>
             </div>
             <div className="glass-card px-4 py-2.5 rounded-xl border-white/10 text-center">
-              <div className="text-xs text-white/50 uppercase font-bold">Total</div>
+              <div className="text-xs text-white/50 uppercase font-bold">Total Peserta</div>
               <div className="text-2xl font-black text-white">{participants.length}</div>
             </div>
           </div>
         </div>
 
-        {/* Participant Input Console */}
-        <div className="mt-6 p-5 sm:p-6 rounded-2xl bg-white/[0.02] border border-white/10">
-          <form onSubmit={handleSubmitAnswer} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs uppercase font-extrabold tracking-wider text-[#8cc63f] flex items-center gap-2">
-                <Send className="w-4 h-4" /> Submit Calculated Capital Valuation
-              </label>
-              <span className="text-xs text-white/40">Expected format: Integer (e.g. 1467)</span>
+        {/* Input Portal Notification Bar */}
+        <div className="mt-4 p-4 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#8cc63f] animate-ping" />
+            <div className="text-xs sm:text-sm text-white/80">
+              <span className="font-extrabold text-white">Portal Input Jawaban Peserta:</span> Buka <strong className="text-[#8cc63f] font-mono px-2 py-0.5 rounded bg-[#8cc63f]/10 border border-[#8cc63f]/30">/inputRound2</strong> untuk mengirim hasil perhitungan.
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              {/* Select Active Participant */}
-              <div className="md:col-span-4">
-                <select
-                  value={selectedParticipantId}
-                  onChange={(e) => setSelectedParticipantId(e.target.value)}
-                  className="w-full bg-neutral-900/90 border border-white/20 rounded-xl px-3 py-3 text-sm text-white font-medium focus:outline-none focus:border-[#8cc63f]"
-                >
-                  {participants.map((p) => (
-                    <option key={p.id} value={p.id} className="bg-neutral-900 text-white">
-                      {p.name} ({p.round2Status.toUpperCase()})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Integer Input */}
-              <div className="md:col-span-5">
-                <input
-                  type="number"
-                  placeholder="Enter integer answer (e.g. 1467)"
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  className="w-full bg-neutral-900/90 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-bold placeholder-white/30 focus:outline-none focus:border-[#8cc63f] focus:ring-1 focus:ring-[#8cc63f]"
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div className="md:col-span-3">
-                <button
-                  type="submit"
-                  className="w-full h-full min-h-[44px] bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(140,198,63,0.3)] hover:shadow-[0_0_25px_rgba(140,198,63,0.5)] flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Submit Answer
-                </button>
-              </div>
-            </div>
-
-            {submissionError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-                <XCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{submissionError}</span>
-              </div>
-            )}
-          </form>
+          </div>
+          <a
+            href="/inputRound2"
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2 rounded-xl bg-[#8cc63f]/20 hover:bg-[#8cc63f]/30 text-[#8cc63f] border border-[#8cc63f]/40 font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+          >
+            <span>Buka /inputRound2</span>
+            <Send className="w-3.5 h-3.5" />
+          </a>
         </div>
+
+        {/* Participant Input Console (Only shown if showInputForm is true) */}
+        {showInputForm && (
+          <div className="mt-6 p-5 sm:p-6 rounded-2xl bg-white/[0.02] border border-white/10">
+            <form onSubmit={handleSubmitAnswer} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs uppercase font-extrabold tracking-wider text-[#8cc63f] flex items-center gap-2">
+                  <Send className="w-4 h-4" /> Submit Calculated Capital Valuation
+                </label>
+                <span className="text-xs text-white/40">Expected format: Integer (e.g. 1467)</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                {/* Select Active Participant */}
+                <div className="md:col-span-4">
+                  <select
+                    value={selectedParticipantId}
+                    onChange={(e) => setSelectedParticipantId(e.target.value)}
+                    className="w-full bg-neutral-900/90 border border-white/20 rounded-xl px-3 py-3 text-sm text-white font-medium focus:outline-none focus:border-[#8cc63f]"
+                  >
+                    {participants.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-neutral-900 text-white">
+                        {p.name} ({p.round2Status.toUpperCase()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Integer Input */}
+                <div className="md:col-span-5">
+                  <input
+                    type="number"
+                    placeholder="Enter integer answer (e.g. 1467)"
+                    value={inputVal}
+                    onChange={(e) => setInputVal(e.target.value)}
+                    className="w-full bg-neutral-900/90 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-bold placeholder-white/30 focus:outline-none focus:border-[#8cc63f] focus:ring-1 focus:ring-[#8cc63f]"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <div className="md:col-span-3">
+                  <button
+                    type="submit"
+                    className="w-full h-full min-h-[44px] bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(140,198,63,0.3)] hover:shadow-[0_0_25px_rgba(140,198,63,0.5)] flex items-center justify-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    Submit Answer
+                  </button>
+                </div>
+              </div>
+
+              {submissionError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                  <XCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{submissionError}</span>
+                </div>
+              )}
+            </form>
+          </div>
+        )}
       </div>
 
       {/* 26 Participants TV Stage Grid (faded default, highlighted Passed / Failed) */}

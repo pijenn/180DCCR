@@ -1,4 +1,5 @@
 export type Round2Status = "pending" | "passed" | "failed";
+export type ParticipantStatus = "active" | "eliminated" | "golden_ticket";
 
 export interface Participant {
   id: string;
@@ -7,6 +8,9 @@ export interface Participant {
   avatar: string;
   score: number;
   round2Status: Round2Status;
+  isGoldenTicket?: boolean;
+  status?: ParticipantStatus;
+  eliminatedInRound?: number | null;
   roundScores?: Record<number, number>;
 }
 
@@ -30,16 +34,25 @@ export interface Question {
   correctAnswer?: string;
 }
 
+export type Round1Phase =
+  | "question_timer"
+  | "question_options"
+  | "correct_answer"
+  | "leaderboard"
+  | "idle"
+  | "preview"
+  | "answering";
+
 export interface GameState {
-  currentRound: number; // 1 to 5
+  currentRound: number; // 1 to 6
   // Round 1 state
   subRoundIndex: number; // 0 to 7
   questionIndex: number; // 0 to questionCount - 1
-  round1Phase: "preview" | "answering" | "idle";
+  round1Phase: Round1Phase;
   round1TimeRemainingMs: number; // in ms
   round1TimerRunning: boolean;
 
-  // Round 2 state
+  // Round 2 state (Capital Conquest)
   round2TargetAnswer: number;
   round2IsOpen: boolean;
 
@@ -48,18 +61,25 @@ export interface GameState {
   round3TimerRunning: boolean;
   round3InitialMs: number;
 
-  // Round 4 state (Pressure Chamber)
-  round4SpinNames: string[];
-  round4SelectedWinner: string | null;
+  // Round 4 state (Sacred Handoff)
   round4TimeRemainingMs: number;
   round4TimerRunning: boolean;
+  round4SpinNames?: string[];
+  round4SelectedWinner?: string | null;
 
-  // Round 5 state (Executive Pitch)
+  // Round 5 state (Pressure Chamber)
   round5SpinNames: string[];
   round5SelectedWinner: string | null;
   round5TimeRemainingMs: number;
   round5TimerRunning: boolean;
-  round5GameEnded: boolean;
+  round5GameEnded?: boolean;
+
+  // Round 6 state (Executive Pitch)
+  round6SpinNames?: string[];
+  round6SelectedWinner?: string | null;
+  round6TimeRemainingMs?: number;
+  round6TimerRunning?: boolean;
+  round6GameEnded?: boolean;
 
   // Participants map or list
   participants: Participant[];
@@ -68,3 +88,4 @@ export interface GameState {
   soundEnabled: boolean;
   lastUpdated: number;
 }
+

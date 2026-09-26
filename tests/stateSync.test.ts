@@ -10,8 +10,8 @@ describe("State Synchronization", () => {
     assert.equal(state.subRoundIndex, 0);
     assert.equal(state.round1Phase, "idle");
     assert.equal(state.round2TargetAnswer, 1467);
-    assert.equal(state.round4SpinNames.length, 9);
-    assert.equal(state.round5SpinNames.length, 5);
+    assert.equal(state.round4SpinNames!.length, 9);
+    assert.equal(state.round5SpinNames!.length, 5);
     assert.equal(state.participants.length, 26);
   });
 

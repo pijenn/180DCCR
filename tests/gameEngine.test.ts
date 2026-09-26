@@ -10,6 +10,10 @@ import {
   getSubRoundPointValue,
   applyScoreChange,
   searchParticipants,
+  getNextQuestionState,
+  getPrevQuestionState,
+  getNextRound1Phase,
+  getPrevRound1Phase,
 } from "../lib/gameEngine.ts";
 
 describe("Game Engine - Round 1: The Gauntlet", () => {
@@ -118,3 +122,51 @@ describe("Game Engine - Score Mutation & Search", () => {
     assert.equal(specificName[0].name, "Rifqi Syarifuddin Yasykur");
   });
 });
+
+describe("Game Engine - Round 1 Flow Progression", () => {
+  it("should advance through the 5-step flow correctly", () => {
+    // 1. Questions & Timer -> 2. Questions, Timer, Options
+    assert.equal(getNextRound1Phase("question_timer"), "question_options");
+    // 2. Questions, Timer, Options -> 3. Correct Answer
+    assert.equal(getNextRound1Phase("question_options"), "correct_answer");
+    // 3. Correct Answer -> 4. Leaderboard
+    assert.equal(getNextRound1Phase("correct_answer"), "leaderboard");
+    // 4. Leaderboard -> 5. Next Question (resets to question_timer)
+    assert.equal(getNextRound1Phase("leaderboard"), "question_timer");
+  });
+
+  it("should reverse through the flow correctly", () => {
+    assert.equal(getPrevRound1Phase("leaderboard"), "correct_answer");
+    assert.equal(getPrevRound1Phase("correct_answer"), "question_options");
+    assert.equal(getPrevRound1Phase("question_options"), "question_timer");
+  });
+
+  it("should advance questions and transition between sub-rounds", () => {
+    // Sub-round 0 has 3 questions (idx 0, 1, 2)
+    const step1 = getNextQuestionState(0, 0);
+    assert.equal(step1.subRoundIndex, 0);
+    assert.equal(step1.questionIndex, 1);
+    assert.equal(step1.isCompleted, false);
+
+    const step2 = getNextQuestionState(0, 1);
+    assert.equal(step2.subRoundIndex, 0);
+    assert.equal(step2.questionIndex, 2);
+    assert.equal(step2.isCompleted, false);
+
+    // End of sub-round 0 -> advance to sub-round 1, question 0
+    const step3 = getNextQuestionState(0, 2);
+    assert.equal(step3.subRoundIndex, 1);
+    assert.equal(step3.questionIndex, 0);
+    assert.equal(step3.isCompleted, false);
+
+    // Going backwards
+    const prev1 = getPrevQuestionState(1, 0);
+    assert.equal(prev1.subRoundIndex, 0);
+    assert.equal(prev1.questionIndex, 2);
+
+    const prev2 = getPrevQuestionState(0, 2);
+    assert.equal(prev2.subRoundIndex, 0);
+    assert.equal(prev2.questionIndex, 1);
+  });
+});
+

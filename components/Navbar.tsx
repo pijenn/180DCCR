@@ -21,6 +21,7 @@ export function Navbar({
     "The Gauntlet",
     "Capital Conquest",
     "Rootmaster",
+    "Sacred Handoff",
     "Pressure Chamber",
     "Executive Pitch",
   ];

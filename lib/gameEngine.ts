@@ -1,4 +1,4 @@
-import type { Participant, SubRoundConfig, Question, GameState } from "./types.ts";
+import type { Participant, SubRoundConfig, Question, GameState, Round1Phase } from "./types.ts";
 
 export const ROUND_1_SUBROUNDS: SubRoundConfig[] = [
   { id: 1, name: "BUSINESS ANALYST", points: 20, questionCount: 3 },
@@ -11,33 +11,39 @@ export const ROUND_1_SUBROUNDS: SubRoundConfig[] = [
   { id: 8, name: "PARTNER", points: 170, questionCount: 3 },
 ];
 
+export const GOLDEN_TICKET_NAMES = [
+  "Rifqi Syarifuddin Yasykur",
+  "Cyka Srihana Humaera",
+  "Ahmad Reva Dany Fawwaz",
+];
+
 export const DEFAULT_PARTICIPANTS: Participant[] = [
-  { id: "p-01", name: "Rifqi Syarifuddin Yasykur", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-02", name: "Mohammad Ali Fikri", university: "Universitas Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-03", name: "Cyka Srihana Humaera", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-04", name: "Alvyan Ananta Asis", university: "Universitas Airlangga", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-05", name: "Mohammad Hilmi Hidayatullah", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-06", name: "Diva Salsabilla", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-07", name: "Muchamad Yafis", university: "Universitas Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-08", name: "Fachri Fabian", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-09", name: "Nafi Satul Fuadhah", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-10", name: "Ngurah Oka", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-11", name: "Rachelle Hasiane", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-12", name: "Ihsan Dianta", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-13", name: "Ahmad Reva Dany Fawwaz", university: "UNAIR", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-14", name: "M. Fajar Akbar Nugeraha", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-15", name: "Surya Rahmat Fatahillah", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-16", name: "Naufal Aryasatya", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-17", name: "Theresia Rosma Exaudi", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-18", name: "Abdullah Shamil Basayev", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-19", name: "Jesslyn Callista", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-20", name: "Nindya Aliyah Maulidina", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-21", name: "Sharlyf Shaquille Syani", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-22", name: "Rexelnino Rajendra", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-23", name: "Hanindita Fernanda Elsharini", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-24", name: "Kelvin William", university: "Universitas Ciputra", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-25", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
-  { id: "p-26", name: "Khalilullah Al-Faiz", university: "180 Degrees Consulting UB", avatar: "/participants/khal.webp", score: 0, round2Status: "pending" },
+  { id: "p-01", name: "Rifqi Syarifuddin Yasykur", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", isGoldenTicket: true, status: "golden_ticket" },
+  { id: "p-02", name: "Mohammad Ali Fikri", university: "Universitas Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-03", name: "Cyka Srihana Humaera", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", isGoldenTicket: true, status: "golden_ticket" },
+  { id: "p-04", name: "Alvyan Ananta Asis", university: "Universitas Airlangga", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-05", name: "Mohammad Hilmi Hidayatullah", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-06", name: "Diva Salsabilla", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-07", name: "Muchamad Yafis", university: "Universitas Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-08", name: "Fachri Fabian", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-09", name: "Nafi Satul Fuadhah", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-10", name: "Ngurah Oka", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-11", name: "Rachelle Hasiane", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-12", name: "Ihsan Dianta", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-13", name: "Ahmad Reva Dany Fawwaz", university: "UNAIR", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", isGoldenTicket: true, status: "golden_ticket" },
+  { id: "p-14", name: "M. Fajar Akbar Nugeraha", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-15", name: "Surya Rahmat Fatahillah", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-16", name: "Naufal Aryasatya", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-17", name: "Theresia Rosma Exaudi", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-18", name: "Abdullah Shamil Basayev", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-19", name: "Jesslyn Callista", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-20", name: "Nindya Aliyah Maulidina", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-21", name: "Sharlyf Shaquille Syani", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-22", name: "Rexelnino Rajendra", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-23", name: "Hanindita Fernanda Elsharini", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-24", name: "Kelvin William", university: "Universitas Ciputra", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-25", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-26", name: "Khalilullah Al-Faiz", university: "180 Degrees Consulting UB", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
 ];
 
 export function getSubRoundPointValue(subRoundIdx: number): number {
@@ -462,7 +468,139 @@ export const SAMPLE_QUESTIONS: Question[] = [
   },
 ];
 
+export interface RoundEliminationConfig {
+  round: number;
+  name: string;
+  startingCount: number;
+  advancingCount: number;
+  eliminatedCount: number;
+  description: string;
+}
+
+export const ROUND_ELIMINATIONS: Record<number, RoundEliminationConfig> = {
+  1: {
+    round: 1,
+    name: "The Gauntlet",
+    startingCount: 23,
+    advancingCount: 18,
+    eliminatedCount: 5,
+    description: "23 Peserta Awal → 18 Peserta Lolos (5 Tereliminasi)",
+  },
+  2: {
+    round: 2,
+    name: "Capital Conquest",
+    startingCount: 18,
+    advancingCount: 15,
+    eliminatedCount: 3,
+    description: "18 Peserta → 15 Peserta Lolos (3 Tereliminasi)",
+  },
+  3: {
+    round: 3,
+    name: "Rootmaster",
+    startingCount: 15,
+    advancingCount: 12,
+    eliminatedCount: 3,
+    description: "15 Peserta → 12 Peserta Lolos (3 Tereliminasi)",
+  },
+  4: {
+    round: 4,
+    name: "Sacred Handoff",
+    startingCount: 12,
+    advancingCount: 9,
+    eliminatedCount: 3,
+    description: "12 Peserta (3 Golden Ticket Masuk) → 9 Peserta Lolos (3 Tereliminasi)",
+  },
+  5: {
+    round: 5,
+    name: "Pressure Chamber",
+    startingCount: 9,
+    advancingCount: 5,
+    eliminatedCount: 4,
+    description: "9 Peserta → 5 Peserta Lolos (4 Tereliminasi)",
+  },
+  6: {
+    round: 6,
+    name: "Executive Pitch",
+    startingCount: 5,
+    advancingCount: 5,
+    eliminatedCount: 0,
+    description: "5 Peserta Final (Juara 1, 2, 3, Harapan 1 & 2)",
+  },
+};
+
+export function getActiveRoundParticipants(
+  participants: Participant[],
+  roundNum: number
+): Participant[] {
+  if (roundNum <= 3) {
+    // Rounds 1-3: Non-golden ticket participants who haven't been eliminated
+    return participants.filter(
+      (p) => !p.isGoldenTicket && (p.eliminatedInRound === undefined || p.eliminatedInRound === null)
+    );
+  }
+  // Round 4+: all participants who haven't been eliminated (including 3 Golden Ticket holders who join now!)
+  return participants.filter(
+    (p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null
+  );
+}
+
+export function eliminateParticipant(
+  participants: Participant[],
+  participantId: string,
+  roundNum: number
+): Participant[] {
+  return participants.map((p) => {
+    if (p.id === participantId) {
+      return { ...p, status: "eliminated", eliminatedInRound: roundNum };
+    }
+    return p;
+  });
+}
+
+export function reinstateParticipant(
+  participants: Participant[],
+  participantId: string
+): Participant[] {
+  return participants.map((p) => {
+    if (p.id === participantId) {
+      return {
+        ...p,
+        status: p.isGoldenTicket ? "golden_ticket" : "active",
+        eliminatedInRound: null,
+      };
+    }
+    return p;
+  });
+}
+
+export function autoAdvanceTopScorers(
+  participants: Participant[],
+  roundNum: number,
+  targetAdvancingCount: number
+): Participant[] {
+  const eligible = getActiveRoundParticipants(participants, roundNum);
+  const sorted = [...eligible].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.name.localeCompare(b.name);
+  });
+
+  const advancingIds = new Set(sorted.slice(0, targetAdvancingCount).map((p) => p.id));
+  const eligibleIds = new Set(eligible.map((p) => p.id));
+
+  return participants.map((p) => {
+    if (!eligibleIds.has(p.id)) return p;
+    if (advancingIds.has(p.id)) {
+      return { ...p, status: "active", eliminatedInRound: null };
+    }
+    return { ...p, status: "eliminated", eliminatedInRound: roundNum };
+  });
+}
+
 export function getInitialGameState(): GameState {
+  const regularParticipants = DEFAULT_PARTICIPANTS.filter((p) => !p.isGoldenTicket);
+  const top9Names = regularParticipants.slice(0, 9).map((p) => p.name);
+  const top5Names = regularParticipants.slice(0, 5).map((p) => p.name);
+
   return {
     currentRound: 1,
     subRoundIndex: 0,
@@ -478,16 +616,22 @@ export function getInitialGameState(): GameState {
     round3TimerRunning: false,
     round3InitialMs: 300000,
 
-    round4SpinNames: DEFAULT_PARTICIPANTS.slice(0, 9).map((p) => p.name),
+    round4SpinNames: top9Names,
     round4SelectedWinner: null,
-    round4TimeRemainingMs: 60000,
+    round4TimeRemainingMs: 300000,
     round4TimerRunning: false,
 
-    round5SpinNames: DEFAULT_PARTICIPANTS.slice(0, 5).map((p) => p.name),
+    round5SpinNames: top5Names,
     round5SelectedWinner: null,
-    round5TimeRemainingMs: 180000,
+    round5TimeRemainingMs: 60000,
     round5TimerRunning: false,
     round5GameEnded: false,
+
+    round6SpinNames: top5Names,
+    round6SelectedWinner: null,
+    round6TimeRemainingMs: 180000,
+    round6TimerRunning: false,
+    round6GameEnded: false,
 
     participants: DEFAULT_PARTICIPANTS,
     soundEnabled: true,
@@ -524,5 +668,87 @@ export function searchParticipants(participants: Participant[], query: string): 
   return participants.filter(
     (p) => p.name.toLowerCase().includes(q) || p.university.toLowerCase().includes(q)
   );
+}
+
+export function getNextQuestionState(
+  subRoundIndex: number,
+  questionIndex: number
+): { subRoundIndex: number; questionIndex: number; isCompleted: boolean } {
+  const currentSubRound = ROUND_1_SUBROUNDS[subRoundIndex] || ROUND_1_SUBROUNDS[0];
+  if (questionIndex + 1 < currentSubRound.questionCount) {
+    return {
+      subRoundIndex,
+      questionIndex: questionIndex + 1,
+      isCompleted: false,
+    };
+  }
+  if (subRoundIndex + 1 < ROUND_1_SUBROUNDS.length) {
+    return {
+      subRoundIndex: subRoundIndex + 1,
+      questionIndex: 0,
+      isCompleted: false,
+    };
+  }
+  return {
+    subRoundIndex,
+    questionIndex,
+    isCompleted: true,
+  };
+}
+
+export function getPrevQuestionState(
+  subRoundIndex: number,
+  questionIndex: number
+): { subRoundIndex: number; questionIndex: number } {
+  if (questionIndex > 0) {
+    return {
+      subRoundIndex,
+      questionIndex: questionIndex - 1,
+    };
+  }
+  if (subRoundIndex > 0) {
+    const prevSubRound = ROUND_1_SUBROUNDS[subRoundIndex - 1];
+    return {
+      subRoundIndex: subRoundIndex - 1,
+      questionIndex: prevSubRound.questionCount - 1,
+    };
+  }
+  return { subRoundIndex: 0, questionIndex: 0 };
+}
+
+export function getNextRound1Phase(currentPhase: Round1Phase): Round1Phase {
+  switch (currentPhase) {
+    case "idle":
+    case "question_timer":
+    case "preview":
+      return "question_options";
+    case "question_options":
+    case "answering":
+      return "correct_answer";
+    case "correct_answer":
+      return "leaderboard";
+    case "leaderboard":
+      return "question_timer";
+    default:
+      return "question_timer";
+  }
+}
+
+export function getPrevRound1Phase(currentPhase: Round1Phase): Round1Phase {
+  switch (currentPhase) {
+    case "leaderboard":
+      return "correct_answer";
+    case "correct_answer":
+      return "question_options";
+    case "question_options":
+    case "answering":
+      return "question_timer";
+    case "question_timer":
+    case "preview":
+    case "idle":
+      return "idle";
+    default:
+      return "question_timer";
+  }
 }
 

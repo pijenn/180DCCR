@@ -1,19 +1,40 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Navbar } from "../components/Navbar.tsx";
-import { KahootLeaderboard } from "../components/KahootLeaderboard.tsx";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Round1Gauntlet } from "../components/Round1Gauntlet.tsx";
 import { Round2CapitalConquest } from "../components/Round2CapitalConquest.tsx";
 import { Round3Rootmaster } from "../components/Round3Rootmaster.tsx";
+import { Round4SacredHandoff } from "../components/Round4SacredHandoff.tsx";
 import { Round4PressureChamber } from "../components/Round4PressureChamber.tsx";
 import { Round5ExecutivePitch } from "../components/Round5ExecutivePitch.tsx";
 import { useGameState } from "../lib/useGameState.ts";
-import { Tv, Trophy } from "lucide-react";
+import { getNextQuestionState, getPrevQuestionState } from "../lib/gameEngine.ts";
+import { Volume2, VolumeX, Maximize2, Minimize2, Shield } from "lucide-react";
 
 export default function ParticipantStagePage() {
   const [gameState, updateState] = useGameState();
-  const [activeTab, setActiveTab] = useState<"game" | "leaderboard">("game");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Toggle browser fullscreen
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  // Listen for fullscreen change events (e.g. user pressed Escape or F11)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   // Timer Tick Loop for active round timers
   useEffect(() => {
@@ -26,11 +47,18 @@ export default function ParticipantStagePage() {
         next.round1TimeRemainingMs = Math.max(0, next.round1TimeRemainingMs - 100);
         changed = true;
 
-        // Auto-transition from Preview (30s) to Answering (30s)
-        if (next.round1TimeRemainingMs === 0 && next.round1Phase === "preview") {
-          next.round1Phase = "answering";
+        // Auto-transition from Question & Timer (30s) to Question & Options (30s)
+        if (
+          next.round1TimeRemainingMs === 0 &&
+          (next.round1Phase === "question_timer" || next.round1Phase === "preview" || next.round1Phase === "idle")
+        ) {
+          next.round1Phase = "question_options";
           next.round1TimeRemainingMs = 30000;
-        } else if (next.round1TimeRemainingMs === 0 && next.round1Phase === "answering") {
+          next.round1TimerRunning = true;
+        } else if (
+          next.round1TimeRemainingMs === 0 &&
+          (next.round1Phase === "question_options" || next.round1Phase === "answering")
+        ) {
           next.round1TimerRunning = false;
         }
       }
@@ -82,127 +110,159 @@ export default function ParticipantStagePage() {
     updateState({ participants: updatedParticipants });
   };
 
+  // Advance question in Round 1
+  const handleNextQuestion = () => {
+    const next = getNextQuestionState(gameState.subRoundIndex, gameState.questionIndex);
+    updateState({
+      subRoundIndex: next.subRoundIndex,
+      questionIndex: next.questionIndex,
+      round1Phase: "question_timer",
+      round1TimeRemainingMs: 30000,
+      round1TimerRunning: true,
+    });
+  };
+
+  // Previous question in Round 1
+  const handlePrevQuestion = () => {
+    const prev = getPrevQuestionState(gameState.subRoundIndex, gameState.questionIndex);
+    updateState({
+      subRoundIndex: prev.subRoundIndex,
+      questionIndex: prev.questionIndex,
+      round1Phase: "question_timer",
+      round1TimeRemainingMs: 30000,
+      round1TimerRunning: false,
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-[#080a09] bg-grid-pattern text-foreground flex flex-col">
-      <Navbar
-        currentRound={gameState.currentRound}
-        soundEnabled={gameState.soundEnabled}
-        onToggleSound={handleToggleSound}
-      />
+    <div className="h-screen w-screen min-h-screen bg-[#080a09] bg-grid-pattern text-foreground flex flex-col justify-between overflow-x-hidden overflow-y-auto relative select-none">
+      {/* Discreet Floating Utility Bar (virtually invisible until hovered) */}
+      <div className="fixed top-3 right-3 z-50 flex items-center gap-1.5 opacity-15 hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/10 shadow-lg">
+        {/* Sound Toggle */}
+        <button
+          onClick={handleToggleSound}
+          title={gameState.soundEnabled ? "Mute Game Audio" : "Unmute Game Audio"}
+          className="p-1.5 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+        >
+          {gameState.soundEnabled ? (
+            <Volume2 className="w-4 h-4 text-[#8cc63f]" />
+          ) : (
+            <VolumeX className="w-4 h-4 text-white/40" />
+          )}
+        </button>
 
-      <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-        {/* Mobile Tab Switcher */}
-        <div className="lg:hidden flex items-center justify-center p-1 rounded-2xl glass-pill max-w-sm mx-auto">
-          <button
-            onClick={() => setActiveTab("game")}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === "game"
-                ? "bg-[#8cc63f] text-black shadow-md"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5" /> Stage & Game
-          </button>
-          <button
-            onClick={() => setActiveTab("leaderboard")}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === "leaderboard"
-                ? "bg-[#8cc63f] text-black shadow-md"
-                : "text-white/60 hover:text-white"
-            }`}
-          >
-            <Trophy className="w-3.5 h-3.5" /> Leaderboard
-          </button>
-        </div>
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          className="p-1.5 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-4 h-4 text-white/70" />
+          ) : (
+            <Maximize2 className="w-4 h-4 text-white/70" />
+          )}
+        </button>
 
-        {/* Main Content Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-          {/* Main Game Arena */}
-          <div
-            className={`lg:col-span-8 space-y-6 ${
-              activeTab === "game" ? "block" : "hidden lg:block"
-            }`}
-          >
-            {gameState.currentRound === 1 && (
-              <Round1Gauntlet
-                subRoundIndex={gameState.subRoundIndex}
-                questionIndex={gameState.questionIndex}
-                phase={gameState.round1Phase}
-                timeRemainingMs={gameState.round1TimeRemainingMs}
-                timerRunning={gameState.round1TimerRunning}
-                soundEnabled={gameState.soundEnabled}
-              />
-            )}
+        {/* Admin Link */}
+        <Link
+          href="/admin"
+          title="Buka Admin Control Room"
+          className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-[#8cc63f] transition-colors"
+        >
+          <Shield className="w-4 h-4" />
+        </Link>
+      </div>
 
-            {gameState.currentRound === 2 && (
-              <Round2CapitalConquest
-                participants={gameState.participants}
-                targetAnswer={gameState.round2TargetAnswer}
-                soundEnabled={gameState.soundEnabled}
-                onParticipantPass={handleRound2Pass}
-              />
-            )}
+      {/* Main Full-Screen Game Arena (No navbar, no footer, pure game content) */}
+      <main className="flex-1 flex flex-col justify-center items-center w-full h-full p-2 sm:p-4 md:p-6 lg:p-8">
+        {gameState.currentRound === 1 && (
+          <Round1Gauntlet
+            subRoundIndex={gameState.subRoundIndex}
+            questionIndex={gameState.questionIndex}
+            phase={gameState.round1Phase}
+            timeRemainingMs={gameState.round1TimeRemainingMs}
+            timerRunning={gameState.round1TimerRunning}
+            soundEnabled={gameState.soundEnabled}
+            participants={gameState.participants}
+            onPhaseChange={(newPhase) =>
+              updateState({
+                round1Phase: newPhase,
+                round1TimerRunning:
+                  newPhase === "question_timer" || newPhase === "question_options",
+                round1TimeRemainingMs:
+                  newPhase === "question_timer" || newPhase === "question_options"
+                    ? 30000
+                    : 0,
+              })
+            }
+            onNextQuestion={handleNextQuestion}
+            onPrevQuestion={handlePrevQuestion}
+          />
+        )}
 
-            {gameState.currentRound === 3 && (
-              <Round3Rootmaster
-                timeRemainingMs={gameState.round3TimeRemainingMs}
-                timerRunning={gameState.round3TimerRunning}
-                soundEnabled={gameState.soundEnabled}
-              />
-            )}
-
-            {gameState.currentRound === 4 && (
-              <Round4PressureChamber
-                spinNames={gameState.round4SpinNames}
-                participants={gameState.participants}
-                timeRemainingMs={gameState.round4TimeRemainingMs}
-                timerRunning={gameState.round4TimerRunning}
-                selectedWinner={gameState.round4SelectedWinner}
-                soundEnabled={gameState.soundEnabled}
-                onSpinEnd={(winner) => updateState({ round4SelectedWinner: winner })}
-              />
-            )}
-
-            {gameState.currentRound === 5 && (
-              <Round5ExecutivePitch
-                spinNames={gameState.round5SpinNames}
-                participants={gameState.participants}
-                timeRemainingMs={gameState.round5TimeRemainingMs}
-                timerRunning={gameState.round5TimerRunning}
-                gameEnded={gameState.round5GameEnded}
-                selectedWinner={gameState.round5SelectedWinner}
-                soundEnabled={gameState.soundEnabled}
-                onSpinEnd={(winner) => updateState({ round5SelectedWinner: winner })}
-              />
-            )}
+        {gameState.currentRound === 2 && (
+          <div className="w-full max-w-6xl mx-auto">
+            <Round2CapitalConquest
+              participants={gameState.participants}
+              targetAnswer={gameState.round2TargetAnswer}
+              soundEnabled={gameState.soundEnabled}
+              onParticipantPass={handleRound2Pass}
+              showInputForm={false}
+            />
           </div>
+        )}
 
-          {/* Kahoot Live Leaderboard Sidebar */}
-          <div
-            className={`lg:col-span-4 ${
-              activeTab === "leaderboard" ? "block" : "hidden lg:block"
-            }`}
-          >
-            <div className="sticky top-24 glass-panel p-4 sm:p-5 rounded-3xl border-white/10 max-h-[calc(100vh-7rem)] overflow-y-auto">
-              <KahootLeaderboard
-                participants={gameState.participants}
-                highlightTop={gameState.currentRound !== 5}
-              />
-            </div>
+        {gameState.currentRound === 3 && (
+          <div className="w-full max-w-5xl mx-auto">
+            <Round3Rootmaster
+              timeRemainingMs={gameState.round3TimeRemainingMs}
+              timerRunning={gameState.round3TimerRunning}
+              soundEnabled={gameState.soundEnabled}
+            />
           </div>
-        </div>
+        )}
+
+        {gameState.currentRound === 4 && (
+          <div className="w-full max-w-6xl mx-auto">
+            <Round4SacredHandoff
+              participants={gameState.participants}
+              timeRemainingMs={gameState.round4TimeRemainingMs || 300000}
+              timerRunning={gameState.round4TimerRunning || false}
+              soundEnabled={gameState.soundEnabled}
+            />
+          </div>
+        )}
+
+        {gameState.currentRound === 5 && (
+          <div className="w-full max-w-5xl mx-auto">
+            <Round4PressureChamber
+              spinNames={gameState.round5SpinNames || gameState.round4SpinNames || []}
+              participants={gameState.participants}
+              timeRemainingMs={gameState.round5TimeRemainingMs ?? gameState.round4TimeRemainingMs ?? 0}
+              timerRunning={gameState.round5TimerRunning ?? gameState.round4TimerRunning ?? false}
+              selectedWinner={gameState.round5SelectedWinner ?? gameState.round4SelectedWinner ?? null}
+              soundEnabled={gameState.soundEnabled}
+              onSpinEnd={(winner) => updateState({ round5SelectedWinner: winner, round4SelectedWinner: winner })}
+            />
+          </div>
+        )}
+
+        {gameState.currentRound === 6 && (
+          <div className="w-full max-w-5xl mx-auto">
+            <Round5ExecutivePitch
+              spinNames={gameState.round6SpinNames || gameState.round5SpinNames || []}
+              participants={gameState.participants}
+              timeRemainingMs={gameState.round6TimeRemainingMs ?? gameState.round5TimeRemainingMs ?? 0}
+              timerRunning={gameState.round6TimerRunning ?? gameState.round5TimerRunning ?? false}
+              gameEnded={gameState.round6GameEnded || gameState.round5GameEnded || false}
+              selectedWinner={gameState.round6SelectedWinner ?? gameState.round5SelectedWinner ?? null}
+              soundEnabled={gameState.soundEnabled}
+              onSpinEnd={(winner) => updateState({ round6SelectedWinner: winner, round5SelectedWinner: winner })}
+            />
+          </div>
+        )}
       </main>
-
-      {/* Sleek Footer inspired by 180dcub.com */}
-      <footer className="mt-auto border-t border-white/10 bg-[#060807] py-6 px-4 text-center text-xs text-white/40">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#8cc63f] animate-pulse" />
-            <span className="text-white/60 font-semibold">180 Degrees Consulting UB TV Show Companion</span>
-          </div>
-          <div>© 2026 180 Degrees Consulting Universitas Brawijaya</div>
-        </div>
-      </footer>
     </div>
   );
 }
