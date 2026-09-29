@@ -14,6 +14,7 @@ import {
   getPrevQuestionState,
   getNextRound1Phase,
   getPrevRound1Phase,
+  getParticipantPhoto,
 } from "../lib/gameEngine.ts";
 
 describe("Game Engine - Round 1: The Gauntlet", () => {
@@ -46,22 +47,32 @@ describe("Game Engine - Round 1: The Gauntlet", () => {
 });
 
 describe("Game Engine - Participants & Leaderboard", () => {
-  it("should initialize exactly 26 participants with default khal avatar", () => {
+  it("should initialize exactly 26 participants with valid local avatars", () => {
     assert.equal(DEFAULT_PARTICIPANTS.length, 26);
     DEFAULT_PARTICIPANTS.forEach((p) => {
       assert.ok(p.id);
       assert.ok(p.name);
       assert.ok(p.university);
-      assert.equal(p.avatar, "/participants/khal.webp");
+      assert.ok(p.avatar);
+      assert.match(p.avatar, /^\/participants\/.+/);
+      assert.notEqual(p.avatar, "/participants/khal.webp");
       assert.equal(p.score, 0);
     });
   });
 
+  it("should resolve local participant photo by name", () => {
+    assert.equal(getParticipantPhoto("Rifqi Syarifuddin Yasykur"), "/participants/Rifqi Syarifuddin (1).png");
+    assert.equal(getParticipantPhoto("Mohammad Ali Fikri"), "/participants/Mohammad Ali Fikri.png");
+    assert.equal(getParticipantPhoto("Cyka Srihana Humaera"), "/participants/Cyka Humaera.JPG");
+    assert.equal(getParticipantPhoto("Faris Audah"), "/participants/Faris Audah.jpeg");
+    assert.equal(getParticipantPhoto("Unknown Person"), "/participants/default-avatar.svg");
+  });
+
   it("should sort leaderboard correctly by score descending", () => {
     const participants = [
-      { id: "1", name: "Alice", university: "Univ A", score: 50, avatar: "/participants/khal.webp", round2Status: "pending" as const },
-      { id: "2", name: "Bob", university: "Univ B", score: 120, avatar: "/participants/khal.webp", round2Status: "pending" as const },
-      { id: "3", name: "Charlie", university: "Univ C", score: 90, avatar: "/participants/khal.webp", round2Status: "pending" as const },
+      { id: "1", name: "Alice", university: "Univ A", score: 50, avatar: "/participants/default-avatar.svg", round2Status: "pending" as const },
+      { id: "2", name: "Bob", university: "Univ B", score: 120, avatar: "/participants/default-avatar.svg", round2Status: "pending" as const },
+      { id: "3", name: "Charlie", university: "Univ C", score: 90, avatar: "/participants/default-avatar.svg", round2Status: "pending" as const },
     ];
 
     const ranked = calculateLeaderboard(participants);
@@ -129,10 +140,29 @@ describe("Game Engine - Round 1 Flow Progression", () => {
     assert.equal(getNextRound1Phase("question_timer"), "question_options");
     // 2. Questions, Timer, Options -> 3. Correct Answer
     assert.equal(getNextRound1Phase("question_options"), "correct_answer");
-    // 3. Correct Answer -> 4. Leaderboard
-    assert.equal(getNextRound1Phase("correct_answer"), "leaderboard");
-    // 4. Leaderboard -> 5. Next Question (resets to question_timer)
+    // 3. Correct Answer -> 4. Leaderboard (only at end of sub-round)
+    assert.equal(getNextRound1Phase("correct_answer", true), "leaderboard");
+    // 3. Correct Answer -> Next Question directly (mid sub-round)
+    assert.equal(getNextRound1Phase("correct_answer", false), "question_timer");
+    // 4. Leaderboard -> 5. Next Question / Sub-round (resets to question_timer)
     assert.equal(getNextRound1Phase("leaderboard"), "question_timer");
+  });
+
+  it("should track point_gauntlet in Round 1 and point_rootmaster in Round 3", () => {
+    const list = [...DEFAULT_PARTICIPANTS];
+    const targetId = list[0].id;
+    // Round 1 scoring
+    const r1Updated = applyScoreChange(list, targetId, 20, 1);
+    const p1 = r1Updated.find((p) => p.id === targetId);
+    assert.equal(p1?.point_gauntlet, 20);
+    assert.equal(p1?.score, 20);
+
+    // Round 3 scoring
+    const r3Updated = applyScoreChange(r1Updated, targetId, 50, 3);
+    const p3 = r3Updated.find((p) => p.id === targetId);
+    assert.equal(p3?.point_gauntlet, 20);
+    assert.equal(p3?.point_rootmaster, 50);
+    assert.equal(p3?.score, 70);
   });
 
   it("should reverse through the flow correctly", () => {

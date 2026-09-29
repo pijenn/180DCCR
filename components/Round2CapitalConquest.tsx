@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { useParams } from "next/navigation";
 import confetti from "canvas-confetti";
 import { Participant } from "../lib/types.ts";
-import { validateRound2Answer } from "../lib/gameEngine.ts";
+import { validateRound2Answer, getParticipantPhoto, getParticipantPhotoPosition, isGoldenTicket } from "../lib/gameEngine.ts";
 import { playSuccessFanfare } from "../lib/audio.ts";
 import { CheckCircle2, XCircle, Clock, Sparkles, Send, X, Award } from "lucide-react";
 
@@ -27,8 +28,17 @@ export function Round2CapitalConquest({
   isAdmin = false,
   showInputForm = false,
 }: Round2CapitalConquestProps) {
+  // Golden ticket participants do not play in Round 2
+  const round2Participants = participants.filter((p) => !isGoldenTicket(p));
   const [inputVal, setInputVal] = useState("");
-  const [selectedParticipantId, setSelectedParticipantId] = useState<string>(participants[0]?.id || "");
+  const params = useParams();
+  const routeRoom = params?.roomCode
+    ? Array.isArray(params.roomCode)
+      ? params.roomCode[0]
+      : params.roomCode
+    : undefined;
+  const inputHref = routeRoom ? `/${routeRoom}/inputRound2` : "/inputRound2";
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string>(round2Participants[0]?.id || "");
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationCountdown, setCelebrationCountdown] = useState(10);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -100,77 +110,78 @@ export function Round2CapitalConquest({
     };
   }, [showCelebration]);
 
-  const passedCount = participants.filter((p) => p.round2Status === "passed").length;
-  const failedCount = participants.filter((p) => p.round2Status === "failed").length;
+  const passedCount = round2Participants.filter((p) => p.round2Status === "passed").length;
+  const failedCount = round2Participants.filter((p) => p.round2Status === "failed").length;
 
   return (
     <div className="w-full space-y-6">
       {/* Round 2 Header Card */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent relative overflow-hidden">
+      <div className="stage-panel p-6 sm:p-8 rounded-2xl border-white/10 bg-[#070b14]/80 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-white/10">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-[#8cc63f]/20 text-[#8cc63f] border border-[#8cc63f]/30">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-[11px] font-mono font-bold uppercase tracking-widest bg-[#0051C3]/20 text-[#38bdf8] border border-[#0051C3]/40">
                 <Sparkles className="w-3.5 h-3.5" />
-                Round 2
+                Round 02
               </span>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white/70">
+              <span className="text-[11px] font-mono font-medium px-2.5 py-1 rounded-sm bg-white/5 text-white/60 border border-white/10">
                 Stage Contestant Arena
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white mt-2 tracking-tight uppercase">
+            <h1 className="text-2xl sm:text-3xl font-black text-white mt-2.5 tracking-tight uppercase font-sans">
               Capital Conquest
             </h1>
-            <p className="text-sm text-white/60 mt-1 max-w-xl">
-              Tampilan kondisi seluruh peserta secara langsung. Peserta melakukan submission kalkulasi valuasi integer di halaman khusus portal peserta.
+            <p className="text-xs sm:text-sm text-white/50 mt-1 max-w-xl font-mono">
+              Live valuation calculation stage. Candidates submit single integer financial valuation at portal.
             </p>
           </div>
 
           {/* Stats Badges */}
-          <div className="flex items-center gap-3">
-            <div className="glass-card px-4 py-2.5 rounded-xl border-emerald-500/30 text-center">
-              <div className="text-xs text-white/50 uppercase font-bold">Passed (Lolos)</div>
-              <div className="text-2xl font-black text-emerald-400">{passedCount}</div>
+          <div className="flex items-center gap-2.5">
+            <div className="px-4 py-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-center">
+              <div className="text-[10px] font-mono text-emerald-400/70 uppercase font-bold tracking-wider">Passed</div>
+              <div className="text-2xl font-mono font-black text-emerald-400">{passedCount}</div>
             </div>
-            <div className="glass-card px-4 py-2.5 rounded-xl border-red-500/30 text-center">
-              <div className="text-xs text-white/50 uppercase font-bold">Failed</div>
-              <div className="text-2xl font-black text-red-400">{failedCount}</div>
+            <div className="px-4 py-2 rounded-lg bg-red-950/30 border border-red-500/30 text-center">
+              <div className="text-[10px] font-mono text-red-400/70 uppercase font-bold tracking-wider">Failed</div>
+              <div className="text-2xl font-mono font-black text-red-400">{failedCount}</div>
             </div>
-            <div className="glass-card px-4 py-2.5 rounded-xl border-white/10 text-center">
-              <div className="text-xs text-white/50 uppercase font-bold">Total Peserta</div>
-              <div className="text-2xl font-black text-white">{participants.length}</div>
+            <div className="px-4 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-center">
+              <div className="text-[10px] font-mono text-white/50 uppercase font-bold tracking-wider">Total</div>
+              <div className="text-2xl font-mono font-black text-white">{round2Participants.length}</div>
             </div>
           </div>
         </div>
 
         {/* Input Portal Notification Bar */}
-        <div className="mt-4 p-4 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="mt-4 p-3.5 rounded-xl bg-[#0051C3]/10 border border-[#0051C3]/30 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#8cc63f] animate-ping" />
-            <div className="text-xs sm:text-sm text-white/80">
-              <span className="font-extrabold text-white">Portal Input Jawaban Peserta:</span> Buka <strong className="text-[#8cc63f] font-mono px-2 py-0.5 rounded bg-[#8cc63f]/10 border border-[#8cc63f]/30">/inputRound2</strong> untuk mengirim hasil perhitungan.
+            <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-ping" />
+            <div className="text-xs sm:text-sm text-white/80 font-mono">
+              <span className="font-bold text-white uppercase">Participant Submission Portal:</span>{" "}
+              <strong className="text-[#38bdf8] px-2 py-0.5 rounded bg-black/40 border border-[#0051C3]/40">{inputHref}</strong>
             </div>
           </div>
           <a
-            href="/inputRound2"
+            href={inputHref}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2 rounded-xl bg-[#8cc63f]/20 hover:bg-[#8cc63f]/30 text-[#8cc63f] border border-[#8cc63f]/40 font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+            className="px-4 py-2 rounded-lg bg-[#0051C3] hover:bg-[#0060e6] text-white font-mono font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm"
           >
-            <span>Buka /inputRound2</span>
+            <span>Open Portal</span>
             <Send className="w-3.5 h-3.5" />
           </a>
         </div>
 
         {/* Participant Input Console (Only shown if showInputForm is true) */}
         {showInputForm && (
-          <div className="mt-6 p-5 sm:p-6 rounded-2xl bg-white/[0.02] border border-white/10">
+          <div className="mt-6 p-5 sm:p-6 rounded-xl bg-black/40 border border-white/10">
             <form onSubmit={handleSubmitAnswer} className="space-y-4">
               <div className="flex items-center justify-between">
-                <label className="text-xs uppercase font-extrabold tracking-wider text-[#8cc63f] flex items-center gap-2">
+                <label className="text-xs uppercase font-mono font-bold tracking-wider text-[#38bdf8] flex items-center gap-2">
                   <Send className="w-4 h-4" /> Submit Calculated Capital Valuation
                 </label>
-                <span className="text-xs text-white/40">Expected format: Integer (e.g. 1467)</span>
+                <span className="text-xs font-mono text-white/40">Expected format: Integer (e.g. 1467)</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -179,9 +190,9 @@ export function Round2CapitalConquest({
                   <select
                     value={selectedParticipantId}
                     onChange={(e) => setSelectedParticipantId(e.target.value)}
-                    className="w-full bg-neutral-900/90 border border-white/20 rounded-xl px-3 py-3 text-sm text-white font-medium focus:outline-none focus:border-[#8cc63f]"
+                    className="w-full bg-[#05070a] border border-white/20 rounded-lg px-3 py-3 text-sm text-white font-mono font-medium focus:outline-none focus:border-[#0051C3]"
                   >
-                    {participants.map((p) => (
+                    {round2Participants.map((p) => (
                       <option key={p.id} value={p.id} className="bg-neutral-900 text-white">
                         {p.name} ({p.round2Status.toUpperCase()})
                       </option>
@@ -196,7 +207,7 @@ export function Round2CapitalConquest({
                     placeholder="Enter integer answer (e.g. 1467)"
                     value={inputVal}
                     onChange={(e) => setInputVal(e.target.value)}
-                    className="w-full bg-neutral-900/90 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-bold placeholder-white/30 focus:outline-none focus:border-[#8cc63f] focus:ring-1 focus:ring-[#8cc63f]"
+                    className="w-full bg-[#05070a] border border-white/20 rounded-lg px-4 py-3 text-sm text-white font-mono font-bold placeholder-white/30 focus:outline-none focus:border-[#0051C3] focus:ring-1 focus:ring-[#0051C3]"
                   />
                 </div>
 
@@ -204,16 +215,16 @@ export function Round2CapitalConquest({
                 <div className="md:col-span-3">
                   <button
                     type="submit"
-                    className="w-full h-full min-h-[44px] bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(140,198,63,0.3)] hover:shadow-[0_0_25px_rgba(140,198,63,0.5)] flex items-center justify-center gap-2"
+                    className="w-full h-full min-h-[44px] bg-[#0051C3] hover:bg-[#0060e6] text-white font-mono font-bold text-xs uppercase rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(0,81,195,0.3)]"
                   >
                     <Send className="w-4 h-4" />
-                    Submit Answer
+                    Submit Valuation
                   </button>
                 </div>
               </div>
 
               {submissionError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 font-mono">
                   <XCircle className="w-4 h-4 flex-shrink-0" />
                   <span>{submissionError}</span>
                 </div>
@@ -223,11 +234,11 @@ export function Round2CapitalConquest({
         )}
       </div>
 
-      {/* 26 Participants TV Stage Grid (faded default, highlighted Passed / Failed) */}
+      {/* Participants TV Stage Grid (faded default, highlighted Passed / Failed) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-2">
           <h3 className="text-sm uppercase font-extrabold tracking-wider text-white/70">
-            Contestants Arena (All 26 Participants)
+            Contestants Arena ({round2Participants.length} Peserta)
           </h3>
           <span className="text-xs text-white/40">
             Green: Passed • Red: Failed • Dim: Pending
@@ -235,7 +246,7 @@ export function Round2CapitalConquest({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {participants.map((p) => {
+          {round2Participants.map((p) => {
             const isPassed = p.round2Status === "passed";
             const isFailed = p.round2Status === "failed";
             const isPending = p.round2Status === "pending";
@@ -281,9 +292,11 @@ export function Round2CapitalConquest({
                   }`}
                 >
                   <Image
-                    src={p.avatar || "/participants/khal.webp"}
+                    src={p.avatar || getParticipantPhoto(p.name)}
                     alt={p.name}
                     fill
+                    sizes="56px"
+                    style={{ objectPosition: getParticipantPhotoPosition(p.name) }}
                     className="object-cover"
                   />
                 </div>
@@ -322,45 +335,45 @@ export function Round2CapitalConquest({
 
       {/* Celebration Popup Modal */}
       {showCelebration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative glass-panel p-8 sm:p-10 rounded-3xl max-w-lg w-full border-[#8cc63f]/60 bg-gradient-to-b from-[#8cc63f]/20 via-neutral-900 to-black text-center shadow-[0_0_60px_rgba(140,198,63,0.4)] animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative stage-panel p-8 sm:p-10 rounded-2xl max-w-lg w-full border-[#0051C3]/80 bg-[#070d1a] text-center shadow-[0_0_60px_rgba(0,81,195,0.4)] animate-in zoom-in-95 duration-300">
             {/* Close Button */}
             <button
               onClick={() => setShowCelebration(false)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Glowing Icon */}
-            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-[#8cc63f] to-emerald-500 flex items-center justify-center text-black shadow-[0_0_35px_rgba(140,198,63,0.6)] mb-6 animate-bounce">
-              <Award className="w-10 h-10 stroke-[2.5]" />
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#0051C3] to-[#38bdf8] flex items-center justify-center text-white shadow-[0_0_35px_rgba(0,81,195,0.6)] mb-6">
+              <Award className="w-8 h-8 stroke-[2.5]" />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#8cc63f]/20 text-[#8cc63f] border border-[#8cc63f]/30 text-xs font-black uppercase tracking-wider mb-2">
-              🎉 Capital Conquest Clear
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm bg-[#0051C3]/20 text-[#38bdf8] border border-[#0051C3]/40 text-xs font-mono font-bold uppercase tracking-wider mb-2">
+              Capital Conquest Clear
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
-              You made it to the next round!
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
+              Valuation Verified
             </h2>
 
-            <p className="text-sm text-white/70 mt-3 leading-relaxed">
-              Outstanding valuation analysis. Your financial projection is locked in, and your qualification has been confirmed!
+            <p className="text-xs sm:text-sm text-white/70 mt-3 font-mono leading-relaxed">
+              Outstanding financial calculation. The projection is validated and qualification has been registered.
             </p>
 
             {/* Auto-close indicator & Action button */}
             <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-xs text-white/50 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-[#8cc63f]" />
+              <div className="text-xs font-mono text-white/50 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>Auto-closing in {celebrationCountdown}s</span>
               </div>
 
               <button
                 onClick={() => setShowCelebration(false)}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(140,198,63,0.4)]"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[#0051C3] hover:bg-[#0060e6] text-white font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(0,81,195,0.4)]"
               >
-                Continue / Close
+                Continue
               </button>
             </div>
           </div>

@@ -2,21 +2,29 @@
 
 import Image from "next/image";
 import { Participant } from "../lib/types.ts";
-import { calculateLeaderboard } from "../lib/gameEngine.ts";
+import { calculateLeaderboard, getParticipantPhoto, getParticipantPhotoPosition, isGoldenTicket } from "../lib/gameEngine.ts";
 import { Trophy, Medal, Award, Sparkles } from "lucide-react";
 
 interface KahootLeaderboardProps {
   participants: Participant[];
   maxDisplay?: number;
   highlightTop?: boolean;
+  currentRound?: number;
 }
 
 export function KahootLeaderboard({
   participants,
   maxDisplay,
   highlightTop = true,
+  currentRound,
 }: KahootLeaderboardProps) {
-  const ranked = calculateLeaderboard(participants);
+  // In rounds 1-3, golden ticket holders do not play and are not shown on the leaderboard
+  const eligibleParticipants =
+    currentRound && currentRound <= 3
+      ? participants.filter((p) => !isGoldenTicket(p))
+      : participants;
+
+  const ranked = calculateLeaderboard(eligibleParticipants);
   const displayList = maxDisplay ? ranked.slice(0, maxDisplay) : ranked;
 
   const getRankBadge = (rank: number) => {
@@ -77,9 +85,11 @@ export function KahootLeaderboard({
             <div className="relative mb-3 mt-1">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full ring-4 ring-slate-300/60 overflow-hidden relative shadow-[0_0_20px_rgba(203,213,225,0.3)]">
                 <Image
-                  src={displayList[1].avatar || "/participants/khal.webp"}
+                  src={displayList[1].avatar || getParticipantPhoto(displayList[1].name)}
                   alt={displayList[1].name}
                   fill
+                  sizes="(max-width: 640px) 64px, 80px"
+                  style={{ objectPosition: getParticipantPhotoPosition(displayList[1].name) }}
                   className="object-cover"
                 />
               </div>
@@ -105,9 +115,11 @@ export function KahootLeaderboard({
             <div className="relative mb-3 mt-1">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full ring-4 ring-[#8cc63f] overflow-hidden relative shadow-[0_0_35px_rgba(140,198,63,0.6)]">
                 <Image
-                  src={displayList[0].avatar || "/participants/khal.webp"}
+                  src={displayList[0].avatar || getParticipantPhoto(displayList[0].name)}
                   alt={displayList[0].name}
                   fill
+                  sizes="(max-width: 640px) 80px, 96px"
+                  style={{ objectPosition: getParticipantPhotoPosition(displayList[0].name) }}
                   className="object-cover"
                 />
               </div>
@@ -131,9 +143,11 @@ export function KahootLeaderboard({
             <div className="relative mb-3 mt-1">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full ring-4 ring-amber-600/60 overflow-hidden relative shadow-[0_0_20px_rgba(217,119,6,0.3)]">
                 <Image
-                  src={displayList[2].avatar || "/participants/khal.webp"}
+                  src={displayList[2].avatar || getParticipantPhoto(displayList[2].name)}
                   alt={displayList[2].name}
                   fill
+                  sizes="(max-width: 640px) 64px, 80px"
+                  style={{ objectPosition: getParticipantPhotoPosition(displayList[2].name) }}
                   className="object-cover"
                 />
               </div>
@@ -177,9 +191,11 @@ export function KahootLeaderboard({
                 {/* Avatar */}
                 <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border border-white/10 flex-shrink-0 bg-neutral-900">
                   <Image
-                    src={participant.avatar || "/participants/khal.webp"}
+                    src={participant.avatar || getParticipantPhoto(participant.name)}
                     alt={participant.name}
                     fill
+                    sizes="44px"
+                    style={{ objectPosition: getParticipantPhotoPosition(participant.name) }}
                     className="object-cover"
                   />
                 </div>

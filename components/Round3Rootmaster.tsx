@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { formatPrecisionCountdown } from "../lib/gameEngine.ts";
 import { playTick, playHurryTick, playBuzzer } from "../lib/audio.ts";
 import { Play, Pause, RotateCcw, Flame } from "lucide-react";
@@ -27,18 +27,25 @@ export function Round3Rootmaster({
   onSetDuration,
 }: Round3RootmasterProps) {
   const totalSec = Math.floor(timeRemainingMs / 1000);
+  const lastPlayedSecRef = useRef<number>(-1);
 
-  // Audio tick trigger
+  // Audio tick trigger (runs only once per full second tick)
   useEffect(() => {
-    if (!timerRunning) return;
-    if (totalSec <= 10 && totalSec > 0) {
-      playHurryTick(soundEnabled);
-    } else if (totalSec > 0) {
-      playTick(soundEnabled);
-    } else if (timeRemainingMs <= 100 && totalSec === 0) {
-      playBuzzer(soundEnabled);
+    if (!timerRunning) {
+      lastPlayedSecRef.current = -1;
+      return;
     }
-  }, [totalSec, timerRunning, soundEnabled, timeRemainingMs]);
+    if (totalSec !== lastPlayedSecRef.current) {
+      lastPlayedSecRef.current = totalSec;
+      if (totalSec <= 10 && totalSec > 0) {
+        playHurryTick(soundEnabled);
+      } else if (totalSec > 0) {
+        playTick(soundEnabled);
+      } else if (totalSec === 0) {
+        playBuzzer(soundEnabled);
+      }
+    }
+  }, [totalSec, timerRunning, soundEnabled]);
 
   const isLowTime = timeRemainingMs <= 30000 && timeRemainingMs > 0;
   const isCriticalTime = timeRemainingMs <= 10000 && timeRemainingMs > 0;
@@ -58,23 +65,10 @@ export function Round3Rootmaster({
           }`}
         />
 
-        {/* Round Badge */}
-        <div className="relative z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#8cc63f]/10 text-[#8cc63f] border border-[#8cc63f]/30 text-xs font-black uppercase tracking-widest mb-4">
-          <Flame className="w-4 h-4 text-[#8cc63f]" />
-          Round 3: Rootmaster
-        </div>
-
-        <h1 className="relative z-10 text-3xl sm:text-5xl font-black text-white tracking-tight uppercase">
-          Problem Root Cause Analysis
-        </h1>
-        <p className="relative z-10 text-sm sm:text-base text-white/50 max-w-xl mx-auto mt-2">
-          Precision time trial for root cause hypothesis formation and MECE issue-tree construction.
-        </p>
-
         {/* Giant Precision Countdown Timer */}
-        <div className="relative z-10 my-10 sm:my-14">
+        <div className="relative z-10 my-8 sm:my-12">
           <div
-            className={`font-mono text-5xl sm:text-8xl md:text-9xl font-black tracking-wider transition-colors duration-300 drop-shadow-[0_0_35px_rgba(0,0,0,0.8)] ${
+            className={`font-mono text-6xl sm:text-8xl md:text-9xl font-black tracking-wider transition-colors duration-300 drop-shadow-[0_0_35px_rgba(0,0,0,0.8)] ${
               isCriticalTime
                 ? "text-red-500 animate-pulse drop-shadow-[0_0_40px_rgba(239,68,68,0.5)]"
                 : isLowTime
@@ -89,18 +83,6 @@ export function Round3Rootmaster({
             <span>Seconds</span>
             <span>Hundredths</span>
           </div>
-        </div>
-
-        {/* Status Indicator */}
-        <div className="relative z-10 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/70">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              timerRunning
-                ? "bg-emerald-500 animate-ping"
-                : "bg-amber-500"
-            }`}
-          />
-          <span>{timerRunning ? "Timer In Progress" : "Countdown Standby"}</span>
         </div>
 
         {/* Interactive Controls (For Stage Operator / Admin) */}

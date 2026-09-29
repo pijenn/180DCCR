@@ -16,8 +16,9 @@ import {
   eliminateParticipant,
   reinstateParticipant,
   autoAdvanceTopScorers,
-  getActiveRoundParticipants,
+  isGoldenTicket,
   GOLDEN_TICKET_NAMES,
+  getParticipantPhoto,
 } from "../lib/gameEngine.ts";
 import {
   Search,
@@ -30,6 +31,8 @@ import {
   Layers,
   Clock,
   Award,
+  Trophy,
+  Crown,
   Disc3,
   PartyPopper,
   RefreshCw,
@@ -43,16 +46,172 @@ import {
   UserCheck,
   Zap,
   Filter,
+  Database,
+  Copy,
+  Check,
 } from "lucide-react";
+import {
+  saveRoomStateToSupabase,
+  seedInitialPlayersToSupabase,
+  GAME_ROOMS_SQL_SCHEMA,
+  normalizeRoomCode,
+} from "../lib/supabase.ts";
 
 interface AdminConsoleProps {
   state: GameState;
   onUpdateState: (patch: Partial<GameState>) => void;
+  roomCode?: string;
 }
 
-export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
+export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsoleProps) {
+  const effectiveRoom = normalizeRoomCode(roomCode || "default");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "active" | "eliminated" | "golden_ticket">("all");
+  const [isSyncingDb, setIsSyncingDb] = useState(false);
+  const [dbNotice, setDbNotice] = useState<string | null>(null);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  // Custom Timer Duration Inputs
+  const [customTimerR1, setCustomTimerR1] = useState("30");
+  const [customTimerR3Min, setCustomTimerR3Min] = useState("5");
+  const [customTimerR3Sec, setCustomTimerR3Sec] = useState("0");
+  const [customTimerR4Min, setCustomTimerR4Min] = useState("5");
+  const [customTimerR4Sec, setCustomTimerR4Sec] = useState("0");
+  const [customTimerR5Sec, setCustomTimerR5Sec] = useState("60");
+  const [customTimerR6Min, setCustomTimerR6Min] = useState("3");
+  const [customTimerR6Sec, setCustomTimerR6Sec] = useState("0");
+
+  const handleSetRound1Timer = (seconds: number) => {
+    const ms = Math.max(1000, seconds * 1000);
+    onUpdateState({
+      round1TimeRemainingMs: ms,
+      round1TimerRunning: false,
+      round1TimerEndAt: null,
+    });
+  };
+
+  const handleSetRound3Timer = (ms: number) => {
+    onUpdateState({
+      round3TimeRemainingMs: ms,
+      round3InitialMs: ms,
+      round3TimerRunning: false,
+      round3TimerEndAt: null,
+    });
+  };
+
+  const handleSetRound4Timer = (ms: number) => {
+    onUpdateState({
+      round4TimeRemainingMs: ms,
+      round4TimerRunning: false,
+      round4TimerEndAt: null,
+    });
+  };
+
+  const handleSetRound5Timer = (ms: number) => {
+    onUpdateState({
+      round5TimeRemainingMs: ms,
+      round4TimeRemainingMs: ms,
+      round5TimerRunning: false,
+      round4TimerRunning: false,
+      round5TimerEndAt: null,
+    });
+  };
+
+  const handleSetRound6Timer = (ms: number) => {
+    onUpdateState({
+      round6TimeRemainingMs: ms,
+      round6TimerRunning: false,
+      round6TimerEndAt: null,
+    });
+  };
+
+  const handleRubricScoreChange = (
+    participantId: string,
+    field: "problemStructuring" | "originality" | "adaptability" | "deckQuality" | "executivePresence",
+    val: number
+  ) => {
+    const maxMap = {
+      problemStructuring: 30,
+      originality: 20,
+      adaptability: 20,
+      deckQuality: 15,
+      executivePresence: 15,
+    };
+    const maxVal = maxMap[field];
+    const clampedVal = Math.max(0, Math.min(maxVal, val));
+
+    const updated = state.participants.map((p) => {
+      if (p.id === participantId) {
+        const currentRubric = p.pressureRubric || {
+          problemStructuring: 0,
+          originality: 0,
+          adaptability: 0,
+          deckQuality: 0,
+          executivePresence: 0,
+        };
+        const newRubric = {
+          ...currentRubric,
+          [field]: clampedVal,
+        };
+        const totalRubric =
+          (newRubric.problemStructuring ?? 0) +
+          (newRubric.originality ?? 0) +
+          (newRubric.adaptability ?? 0) +
+          (newRubric.deckQuality ?? 0) +
+          (newRubric.executivePresence ?? 0);
+
+        const roundScores = { ...(p.roundScores || {}) };
+        roundScores[5] = totalRubric;
+
+        return {
+          ...p,
+          pressureRubric: newRubric,
+          score: totalRubric,
+          roundScores,
+        };
+      }
+      return p;
+    });
+    onUpdateState({ participants: updated });
+  };
+
+  const handleSyncToSupabase = async () => {
+    setIsSyncingDb(true);
+    setDbNotice(null);
+    try {
+      const ok = await saveRoomStateToSupabase(effectiveRoom, state);
+      if (ok) {
+        setDbNotice(`State Room '${effectiveRoom}' berhasil disimpan ke Supabase!`);
+      } else {
+        setDbNotice("Tabel 'game_rooms' belum ada di Supabase. Klik 'SQL Setup DB' untuk menjalankan SQL.");
+      }
+    } catch (err: unknown) {
+      setDbNotice("Error: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSyncingDb(false);
+      setTimeout(() => setDbNotice(null), 5000);
+    }
+  };
+
+  const handleSeedSupabase = async () => {
+    if (!confirm(`Reset data 26 pemain ke default untuk Room '${effectiveRoom}'?`)) return;
+    setIsSyncingDb(true);
+    setDbNotice(null);
+    try {
+      const ok = await seedInitialPlayersToSupabase(effectiveRoom);
+      if (ok) {
+        setDbNotice(`26 peserta Room '${effectiveRoom}' berhasil di-reset ke default!`);
+      } else {
+        setDbNotice("Gagal reset data room.");
+      }
+    } catch (err: unknown) {
+      setDbNotice("Error: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSyncingDb(false);
+      setTimeout(() => setDbNotice(null), 5000);
+    }
+  };
 
   const currentQuota = ROUND_ELIMINATIONS[state.currentRound] || {
     round: state.currentRound,
@@ -100,7 +259,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
   const searchedParticipants = searchParticipants(state.participants, searchQuery);
 
   const filteredParticipants = searchedParticipants.filter((p) => {
-    const isGT = p.isGoldenTicket || GOLDEN_TICKET_NAMES.includes(p.name);
+    const isGT = isGoldenTicket(p);
     const isEliminated = p.eliminatedInRound !== undefined && p.eliminatedInRound !== null;
 
     if (filterTab === "active") {
@@ -135,7 +294,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
 
   // Helper to change score
   const handleScoreChange = (participantId: string, delta: number) => {
-    const updated = applyScoreChange(state.participants, participantId, delta);
+    const updated = applyScoreChange(state.participants, participantId, delta, state.currentRound);
     onUpdateState({ participants: updated });
   };
 
@@ -158,24 +317,29 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
       round1Phase: "question_timer",
       round1TimeRemainingMs: 30000,
       round1TimerRunning: false,
+      round1TimerEndAt: null,
     });
   };
 
   // Step 1: Question & Timer
   const handleStepQuestionTimer = () => {
+    const duration = 30000;
     onUpdateState({
       round1Phase: "question_timer",
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: duration,
       round1TimerRunning: true,
+      round1TimerEndAt: Date.now() + duration,
     });
   };
 
   // Step 2: Question, Timer, Options
   const handleStepQuestionOptions = () => {
+    const duration = 30000;
     onUpdateState({
       round1Phase: "question_options",
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: duration,
       round1TimerRunning: true,
+      round1TimerEndAt: Date.now() + duration,
     });
   };
 
@@ -184,6 +348,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
     onUpdateState({
       round1Phase: "correct_answer",
       round1TimerRunning: false,
+      round1TimerEndAt: null,
       round1TimeRemainingMs: 0,
     });
   };
@@ -193,18 +358,21 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
     onUpdateState({
       round1Phase: "leaderboard",
       round1TimerRunning: false,
+      round1TimerEndAt: null,
     });
   };
 
   // Step 5: Next Soal
   const handleNextQuestion = () => {
     const next = getNextQuestionState(state.subRoundIndex, state.questionIndex);
+    const duration = 30000;
     onUpdateState({
       subRoundIndex: next.subRoundIndex,
       questionIndex: next.questionIndex,
       round1Phase: "question_timer",
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: duration,
       round1TimerRunning: true,
+      round1TimerEndAt: Date.now() + duration,
     });
   };
 
@@ -217,18 +385,25 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
       round1Phase: "question_timer",
       round1TimeRemainingMs: 30000,
       round1TimerRunning: false,
+      round1TimerEndAt: null,
     });
   };
 
   // One-click Next Step
   const handleNextStep = () => {
     const current = state.round1Phase;
+    const isEndOfSubRound = state.questionIndex >= currentSubRound.questionCount - 1;
     if (current === "question_timer" || current === "preview" || current === "idle") {
       handleStepQuestionOptions();
     } else if (current === "question_options" || current === "answering") {
       handleStepCorrectAnswer();
     } else if (current === "correct_answer") {
-      handleStepLeaderboard();
+      // Leaderboard only when sub-round ends!
+      if (isEndOfSubRound) {
+        handleStepLeaderboard();
+      } else {
+        handleNextQuestion();
+      }
     } else if (current === "leaderboard") {
       handleNextQuestion();
     }
@@ -250,8 +425,12 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
 
   // Pause / Resume Round 1 Timer
   const handleToggleRound1Timer = () => {
+    const willRun = !state.round1TimerRunning;
+    const remaining = state.round1TimeRemainingMs > 0 ? state.round1TimeRemainingMs : 30000;
     onUpdateState({
-      round1TimerRunning: !state.round1TimerRunning,
+      round1TimerRunning: willRun,
+      round1TimeRemainingMs: remaining,
+      round1TimerEndAt: willRun ? Date.now() + remaining : null,
     });
   };
 
@@ -260,6 +439,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
     onUpdateState({
       round1TimeRemainingMs: 30000,
       round1TimerRunning: false,
+      round1TimerEndAt: null,
       round1Phase: "question_timer",
     });
   };
@@ -309,13 +489,50 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
             </h1>
           </div>
 
-          <button
-            onClick={handleResetAllGame}
-            className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold flex items-center gap-2 transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset Game State
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleSyncToSupabase}
+              disabled={isSyncingDb}
+              className="px-4 py-2 rounded-xl bg-[#8cc63f]/15 hover:bg-[#8cc63f]/25 text-[#8cc63f] border border-[#8cc63f]/30 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+              title="Simpan data seluruh 26 peserta ke tabel 'player' dan progress ke 'game_progress' Supabase"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>{isSyncingDb ? "Menyimpan ke DB..." : "Sync ke Supabase"}</span>
+            </button>
+
+            <button
+              onClick={() => setShowSqlModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Lihat atau salin script SQL untuk setup tabel player di Supabase"
+            >
+              <Database className="w-3.5 h-3.5 text-[#8cc63f]" />
+              <span>SQL Setup DB</span>
+            </button>
+
+            <button
+              onClick={handleResetAllGame}
+              className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Reset Game State
+            </button>
+          </div>
         </div>
+
+        {/* Supabase Notification Banner */}
+        {dbNotice && (
+          <div className="mt-4 p-3 rounded-xl bg-[#8cc63f]/10 border border-[#8cc63f]/30 text-[#8cc63f] text-xs font-semibold flex items-center justify-between animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              <span>{dbNotice}</span>
+            </div>
+            <button
+              onClick={() => setDbNotice(null)}
+              className="text-white/40 hover:text-white text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Master Round Navigation Selector */}
         <div className="mt-6">
@@ -383,7 +600,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
 
             {/* Quick Link to Stage */}
             <a
-              href="/"
+              href={`/${effectiveRoom}`}
               target="_blank"
               rel="noreferrer"
               className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/10 transition-colors"
@@ -522,12 +739,25 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                 className={`p-3 rounded-2xl text-left border transition-all ${
                   state.round1Phase === "leaderboard"
                     ? "bg-purple-600 text-white border-purple-400 font-black shadow-[0_0_15px_rgba(168,85,247,0.4)] scale-[1.02]"
-                    : "bg-white/[0.03] border-white/10 text-white/80 hover:bg-white/10"
+                    : state.questionIndex >= currentSubRound.questionCount - 1
+                    ? "bg-purple-950/30 border-purple-500/40 text-purple-200 hover:bg-purple-900/40"
+                    : "bg-white/[0.03] border-white/10 text-white/70 hover:bg-white/10"
                 }`}
               >
-                <div className="text-[10px] uppercase font-black opacity-70">Langkah 4</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] uppercase font-black opacity-70">Langkah 4</div>
+                  {state.questionIndex >= currentSubRound.questionCount - 1 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200 font-black uppercase tracking-wider">
+                      Akhir Round
+                    </span>
+                  )}
+                </div>
                 <div className="font-extrabold text-xs sm:text-sm mt-0.5">4. Leaderboard</div>
-                <div className="text-[11px] opacity-75 mt-0.5">Tampilkan Klasemen</div>
+                <div className="text-[11px] opacity-75 mt-0.5">
+                  {state.questionIndex >= currentSubRound.questionCount - 1
+                    ? "Tampil setelah Soal Terakhir"
+                    : "Tampil saat Sub-Round Selesai"}
+                </div>
               </button>
 
               {/* Step 5 */}
@@ -578,12 +808,50 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
               </button>
             </div>
 
-            {/* Quick Timer Controls */}
-            <div className="flex items-center gap-2">
+            {/* Quick Timer Controls & Custom Setting */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-xl">
+                <Clock className="w-3.5 h-3.5 text-[#8cc63f]" />
+                <span className="text-[10px] text-white/50 uppercase font-bold">Set Timer:</span>
+                <input
+                  type="number"
+                  min="5"
+                  max="300"
+                  value={customTimerR1}
+                  onChange={(e) => setCustomTimerR1(e.target.value)}
+                  className="w-12 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/40">s</span>
+                <button
+                  type="button"
+                  onClick={() => handleSetRound1Timer(parseInt(customTimerR1, 10) || 30)}
+                  className="px-2 py-0.5 rounded bg-[#8cc63f]/20 hover:bg-[#8cc63f]/40 text-[#8cc63f] text-[10px] font-bold cursor-pointer transition-colors"
+                >
+                  Terapkan
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="hidden sm:flex items-center gap-1 text-[10px]">
+                {[15, 30, 45, 60].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setCustomTimerR1(String(s));
+                      handleSetRound1Timer(s);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                  >
+                    {s}s
+                  </button>
+                ))}
+              </div>
+
               <button
                 type="button"
                 onClick={handleToggleRound1Timer}
-                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
               >
                 {state.round1TimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 {state.round1TimerRunning ? "Pause Timer" : "Mulai Timer"}
@@ -592,17 +860,17 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
               <button
                 type="button"
                 onClick={handleResetRound1Timer}
-                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset 30s</span>
+                <span>Reset ({customTimerR1}s)</span>
               </button>
 
               <button
                 type="button"
                 onClick={handlePrevQuestion}
                 disabled={state.questionIndex === 0 && state.subRoundIndex === 0}
-                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white font-bold text-xs flex items-center gap-1"
+                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
                 title="Soal Sebelumnya"
               >
                 <ChevronLeft className="w-3.5 h-3.5" /> Soal Sebelumnya
@@ -611,7 +879,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
               <button
                 type="button"
                 onClick={handleNextQuestion}
-                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center gap-1"
+                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
                 title="Soal Berikutnya"
               >
                 Soal Berikutnya <ChevronRight className="w-3.5 h-3.5" />
@@ -634,7 +902,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                     key={sr.id}
                     type="button"
                     onClick={() => handleSelectSubRound(idx)}
-                    className={`p-2.5 rounded-xl text-left border transition-all ${
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
                       isSelected
                         ? isCrisis
                           ? "bg-red-600 text-white border-red-500 font-black shadow-[0_0_15px_rgba(220,38,38,0.5)]"
@@ -646,7 +914,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                       {isCrisis ? "Emergency" : `Rank #${sr.id}`}
                     </div>
                     <div className="text-xs font-extrabold line-clamp-1 mt-0.5">{sr.name}</div>
-                    <div className="text-[11px] font-bold text-[#8cc63f] mt-1">+{sr.points} pts</div>
+                    <div className="text-[11px] font-bold text-[#8cc63f] mt-1">+{sr.points} / -{sr.points} pts</div>
                   </button>
                 );
               })}
@@ -665,7 +933,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                 Round 2: Capital Conquest Pass / Fail Decider
               </h2>
               <p className="text-xs text-white/50">
-                Mark participants as Passed or Failed. Correct answer is configured to {state.round2TargetAnswer}.
+                Poin score ditiadakan pada round ini. Hanya tentukan status Passed atau Failed bagi setiap peserta.
               </p>
             </div>
 
@@ -687,32 +955,93 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
       {/* Round 3 Admin Controls */}
       {state.currentRound === 3 && (
         <div className="glass-panel p-6 rounded-3xl border-white/10 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div>
               <h2 className="text-lg font-black text-white uppercase flex items-center gap-2">
                 <Clock className="w-5 h-5 text-amber-400" />
-                Round 3: Rootmaster Stage Timer
+                Round 3: Rootmaster Stage Timer & Score Settings
               </h2>
               <p className="text-xs text-white/50">
-                Remote control the precision countdown (Mins:Seconds:Hundredths).
+                Atur durasi waktu countdown Rootmaster. Skor scoring: <strong className="text-emerald-400 font-bold">+20 pts</strong> jika benar, <strong className="text-red-400 font-bold">-5 pts</strong> jika salah.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Custom Timer Input & Timer Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] text-white/50 uppercase font-bold">Durasi Timer:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customTimerR3Min}
+                  onChange={(e) => setCustomTimerR3Min(e.target.value)}
+                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/50 font-bold">m</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customTimerR3Sec}
+                  onChange={(e) => setCustomTimerR3Sec(e.target.value)}
+                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/50 font-bold">s</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const min = parseInt(customTimerR3Min, 10) || 0;
+                    const sec = parseInt(customTimerR3Sec, 10) || 0;
+                    const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                    handleSetRound3Timer(ms);
+                  }}
+                  className="px-2.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 text-[10px] font-bold cursor-pointer transition-colors"
+                >
+                  Set
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1 text-[10px]">
+                {[
+                  { label: "3m", ms: 180000, m: "3", s: "0" },
+                  { label: "5m", ms: 300000, m: "5", s: "0" },
+                  { label: "10m", ms: 600000, m: "10", s: "0" },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setCustomTimerR3Min(preset.m);
+                      setCustomTimerR3Sec(preset.s);
+                      handleSetRound3Timer(preset.ms);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() => onUpdateState({ round3TimerRunning: !state.round3TimerRunning })}
-                className="px-5 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(140,198,63,0.3)]"
+                className="px-4 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(140,198,63,0.3)] cursor-pointer"
               >
                 {state.round3TimerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-black" />}
                 {state.round3TimerRunning ? "Pause Timer" : "Start Timer"}
               </button>
+
               <button
-                onClick={() =>
-                  onUpdateState({ round3TimeRemainingMs: 300000, round3TimerRunning: false })
-                }
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5"
+                onClick={() => {
+                  const min = parseInt(customTimerR3Min, 10) || 5;
+                  const sec = parseInt(customTimerR3Sec, 10) || 0;
+                  const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                  handleSetRound3Timer(ms);
+                }}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
               >
-                <RotateCcw className="w-4 h-4" /> Reset (5m)
+                <RotateCcw className="w-4 h-4" /> Reset
               </button>
             </div>
           </div>
@@ -722,7 +1051,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
       {/* Round 4 Admin Controls (Sacred Handoff: 12 -> 9) */}
       {state.currentRound === 4 && (
         <div className="glass-panel p-6 rounded-3xl border-amber-500/30 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -735,25 +1064,86 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                 Golden Ticket Official Entrance & Elimination (12 → 9)
               </h2>
               <p className="text-xs text-white/60">
-                3 Peserta Golden Ticket (Rifqi, Cyka, Ahmad Reva) resmi aktif dan bersaing bersama 9 kontender yang lolos dari Rootmaster.
+                3 Peserta Golden Ticket resmi aktif dan bersaing bersama 9 kontender dari Rootmaster.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Custom Timer Input & Timer Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] text-white/50 uppercase font-bold">Durasi Timer:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customTimerR4Min}
+                  onChange={(e) => setCustomTimerR4Min(e.target.value)}
+                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/50 font-bold">m</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customTimerR4Sec}
+                  onChange={(e) => setCustomTimerR4Sec(e.target.value)}
+                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/50 font-bold">s</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const min = parseInt(customTimerR4Min, 10) || 0;
+                    const sec = parseInt(customTimerR4Sec, 10) || 0;
+                    const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                    handleSetRound4Timer(ms);
+                  }}
+                  className="px-2.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 text-[10px] font-bold cursor-pointer transition-colors"
+                >
+                  Set
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1 text-[10px]">
+                {[
+                  { label: "3m", ms: 180000, m: "3", s: "0" },
+                  { label: "5m", ms: 300000, m: "5", s: "0" },
+                  { label: "10m", ms: 600000, m: "10", s: "0" },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setCustomTimerR4Min(preset.m);
+                      setCustomTimerR4Sec(preset.s);
+                      handleSetRound4Timer(preset.ms);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() => onUpdateState({ round4TimerRunning: !state.round4TimerRunning })}
-                className="px-5 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(140,198,63,0.3)] cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(140,198,63,0.3)] cursor-pointer"
               >
                 {state.round4TimerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-black" />}
                 {state.round4TimerRunning ? "Pause Timer" : "Start Timer"}
               </button>
+
               <button
-                onClick={() =>
-                  onUpdateState({ round4TimeRemainingMs: 300000, round4TimerRunning: false })
-                }
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
+                onClick={() => {
+                  const min = parseInt(customTimerR4Min, 10) || 5;
+                  const sec = parseInt(customTimerR4Sec, 10) || 0;
+                  const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                  handleSetRound4Timer(ms);
+                }}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
               >
-                <RotateCcw className="w-4 h-4" /> Reset (5m)
+                <RotateCcw className="w-4 h-4" /> Reset
               </button>
             </div>
           </div>
@@ -762,25 +1152,69 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
 
       {/* Round 5 Admin Controls (Pressure Chamber: 9 -> 5) */}
       {state.currentRound === 5 && (
-        <div className="glass-panel p-6 rounded-3xl border-white/10 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+        <div className="glass-panel p-6 rounded-3xl border-purple-500/30 space-y-6">
+          {/* Top Bar with Timer, Wheel Reset, & Stage Leaderboard Toggle */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-red-500/20 text-red-300 border border-red-500/30">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   <Disc3 className="w-3.5 h-3.5" />
-                  Round 5: Pressure Chamber Controller
+                  Round 5: Pressure Chamber Flow & Rubric Scoring
                 </span>
                 <span className="text-xs text-white/50">9 Kontender → 5 Finalis</span>
               </div>
               <h2 className="text-lg font-black text-white uppercase mt-1">
-                Pressure Chamber (9 Names Spin Wheel)
+                Pressure Chamber Controller & Rubric Scoring
               </h2>
               <p className="text-xs text-white/50">
-                Atur 9 nama kandidat roulette dan timer hitung mundur eliminasi.
+                Pemain yang sudah terpilih di roda akan otomatis hilang. Leaderboard di stage hanya akan tampil ketika Anda memencet tombol toggle di bawah.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Timer & Stage View Toggle Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Custom Timer Input */}
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-xl">
+                <Clock className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-[10px] text-white/50 uppercase font-bold">Timer:</span>
+                <input
+                  type="number"
+                  min="5"
+                  max="600"
+                  value={customTimerR5Sec}
+                  onChange={(e) => setCustomTimerR5Sec(e.target.value)}
+                  className="w-12 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/40">s</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sec = parseInt(customTimerR5Sec, 10) || 60;
+                    handleSetRound5Timer(sec * 1000);
+                  }}
+                  className="px-2 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[10px] font-bold cursor-pointer transition-colors"
+                >
+                  Set
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="hidden sm:flex items-center gap-1 text-[10px]">
+                {[30, 60, 90, 120].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setCustomTimerR5Sec(String(s));
+                      handleSetRound5Timer(s * 1000);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                  >
+                    {s}s
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() =>
                   onUpdateState({
@@ -788,24 +1222,269 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                     round4TimerRunning: !state.round4TimerRunning,
                   })
                 }
-                className="px-4 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1 cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1 cursor-pointer"
               >
                 {state.round5TimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-black" />}
-                {state.round5TimerRunning ? "Pause Timer" : "Start Timer"}
+                {state.round5TimerRunning ? "Pause" : "Mulai"}
               </button>
+
               <button
-                onClick={() =>
-                  onUpdateState({
-                    round5TimeRemainingMs: 60000,
-                    round5TimerRunning: false,
-                    round4TimeRemainingMs: 60000,
-                    round4TimerRunning: false,
-                  })
-                }
+                onClick={() => {
+                  const sec = parseInt(customTimerR5Sec, 10) || 60;
+                  handleSetRound5Timer(sec * 1000);
+                }}
                 className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1 cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Reset (60s)
+                <RotateCcw className="w-3.5 h-3.5" /> Reset
               </button>
+
+              {/* Stage Leaderboard Toggle Button */}
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateState({ round5ShowLeaderboard: !state.round5ShowLeaderboard })
+                }
+                className={`px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-lg cursor-pointer ${
+                  state.round5ShowLeaderboard
+                    ? "bg-purple-600 text-white border-2 border-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.5)] animate-pulse"
+                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
+                }`}
+              >
+                <Award className="w-4 h-4" />
+                <span>
+                  {state.round5ShowLeaderboard
+                    ? "Layar Stage: LEADERBOARD AKTIF (TAMPIL)"
+                    : "Tampilkan Leaderboard di Stage"}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Active Wheel Candidates & Reset Button */}
+          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs uppercase font-extrabold text-white/70">
+                Kontender Roda Putar Pressure Chamber (Tersisa:{" "}
+                <strong className="text-[#8cc63f]">
+                  {(
+                    (state.round5SpinNames && state.round5SpinNames.length > 0)
+                      ? state.round5SpinNames
+                      : state.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
+                  ).length}
+                </strong>{" "}
+                nama di wheel):
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const activeNonGT = state.participants.filter(
+                      (p) => !p.isGoldenTicket && p.status !== "eliminated"
+                    );
+                    const top9 = (activeNonGT.length >= 9
+                      ? activeNonGT.slice(0, 9).map((p) => p.name)
+                      : state.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
+                    ).slice(0, 9);
+                    onUpdateState({
+                      round5SpinNames: top9,
+                      round4SpinNames: top9,
+                      round5SpunWinners: [],
+                    });
+                  }}
+                  className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-[#8cc63f] flex items-center gap-1 font-bold cursor-pointer transition-colors"
+                >
+                  <RefreshCw className="w-3 h-3" /> Reset Roda ke 9 Peserta
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {((state.round5SpinNames && state.round5SpinNames.length > 0)
+                ? state.round5SpinNames
+                : state.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
+              ).map((name, idx) => (
+                <div
+                  key={idx}
+                  className="p-2 rounded-xl bg-purple-950/20 border border-purple-500/20 text-xs font-semibold text-white/90 flex items-center gap-2 truncate"
+                >
+                  <span className="w-5 h-5 rounded-md bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="truncate">{name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Dedicated Pressure Chamber Rubric Scoring Table (Image 1 Rubric Criteria) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <Award className="w-4 h-4 text-purple-400" />
+                  Tabel Penilaian Rubrik Pressure Chamber (Sesuai Format Juri)
+                </h3>
+                <p className="text-[11px] text-white/50">
+                  Input nilai per kriteria. Skor akhir (Final Score) otomatis terhitung dan langsung disinkronkan ke leaderboard live stage.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-purple-500/30 bg-[#090312]/70">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-purple-950/50 border-b border-purple-500/30 text-white/70 uppercase font-mono font-bold text-[11px]">
+                    <th className="py-2.5 px-3">No.</th>
+                    <th className="py-2.5 px-3">Nama Peserta</th>
+                    <th className="py-2.5 px-3 text-center text-[#f87171]">
+                      Problem Structuring (30)
+                    </th>
+                    <th className="py-2.5 px-3 text-center text-[#f87171]">
+                      Originality (20)
+                    </th>
+                    <th className="py-2.5 px-3 text-center text-[#f87171]">
+                      Adaptability (20)
+                    </th>
+                    <th className="py-2.5 px-3 text-center text-[#f87171]">
+                      Deck Quality (15)
+                    </th>
+                    <th className="py-2.5 px-3 text-center text-[#f87171]">
+                      Exec Presence (15)
+                    </th>
+                    <th className="py-2.5 px-3 text-center text-[#38bdf8] font-black bg-purple-900/30">
+                      Final Score (100)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {state.participants
+                    .filter((p) => !p.isGoldenTicket && (p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 5))
+                    .slice(0, 9)
+                    .map((p, idx) => {
+                      const rubric = p.pressureRubric || {
+                        problemStructuring: 0,
+                        originality: 0,
+                        adaptability: 0,
+                        deckQuality: 0,
+                        executivePresence: 0,
+                      };
+                      const totalScore =
+                        (rubric.problemStructuring ?? 0) +
+                        (rubric.originality ?? 0) +
+                        (rubric.adaptability ?? 0) +
+                        (rubric.deckQuality ?? 0) +
+                        (rubric.executivePresence ?? 0);
+
+                      return (
+                        <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-2.5 px-3 font-mono text-white/40">{idx + 1}</td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-white text-xs">{p.name}</div>
+                            <div className="text-[10px] text-white/40 truncate">{p.university}</div>
+                          </td>
+
+                          {/* Problem Structuring (Max 30) */}
+                          <td className="py-2.5 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="30"
+                              value={rubric.problemStructuring ?? 0}
+                              onChange={(e) =>
+                                handleRubricScoreChange(
+                                  p.id,
+                                  "problemStructuring",
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
+                            />
+                          </td>
+
+                          {/* Originality (Max 20) */}
+                          <td className="py-2.5 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="20"
+                              value={rubric.originality ?? 0}
+                              onChange={(e) =>
+                                handleRubricScoreChange(
+                                  p.id,
+                                  "originality",
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
+                            />
+                          </td>
+
+                          {/* Adaptability (Max 20) */}
+                          <td className="py-2.5 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="20"
+                              value={rubric.adaptability ?? 0}
+                              onChange={(e) =>
+                                handleRubricScoreChange(
+                                  p.id,
+                                  "adaptability",
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
+                            />
+                          </td>
+
+                          {/* Deck Quality (Max 15) */}
+                          <td className="py-2.5 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="15"
+                              value={rubric.deckQuality ?? 0}
+                              onChange={(e) =>
+                                handleRubricScoreChange(
+                                  p.id,
+                                  "deckQuality",
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
+                            />
+                          </td>
+
+                          {/* Executive Presence (Max 15) */}
+                          <td className="py-2.5 px-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="15"
+                              value={rubric.executivePresence ?? 0}
+                              onChange={(e) =>
+                                handleRubricScoreChange(
+                                  p.id,
+                                  "executivePresence",
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
+                            />
+                          </td>
+
+                          {/* Total Final Score */}
+                          <td className="py-2.5 px-3 text-center bg-purple-900/20">
+                            <span className="font-mono font-black text-sm text-[#00d2ff]">
+                              {totalScore}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -814,7 +1493,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
       {/* Round 6 Admin Controls (Executive Pitch: 5 Finalists) */}
       {state.currentRound === 6 && (
         <div className="glass-panel p-6 rounded-3xl border-amber-500/30 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -824,14 +1503,71 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                 <span className="text-xs text-white/50">Penentuan Juara 1, 2, 3, Harapan 1 & 2</span>
               </div>
               <h2 className="text-lg font-black text-white uppercase mt-1 gold-gradient">
-                Executive Pitch Final Controls
+                Executive Pitch Final Controls & Winners
               </h2>
               <p className="text-xs text-white/50">
-                Input skor akhir 5 finalis dan tutup game untuk pengumuman pemenang resmi.
+                Putar roda untuk 5 finalis. Nama yang sudah tampil otomatis hilang dari roda. Leaderboard/Final Standings dapat di-toggle untuk broadcast stage.
               </p>
             </div>
 
+            {/* Custom Timer & Game End Buttons */}
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] text-white/50 uppercase font-bold">Timer Pitch:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customTimerR6Min}
+                  onChange={(e) => setCustomTimerR6Min(e.target.value)}
+                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/50 font-bold">m</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={customTimerR6Sec}
+                  onChange={(e) => setCustomTimerR6Sec(e.target.value)}
+                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                />
+                <span className="text-[10px] text-white/50 font-bold">s</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const min = parseInt(customTimerR6Min, 10) || 0;
+                    const sec = parseInt(customTimerR6Sec, 10) || 0;
+                    const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                    handleSetRound6Timer(ms);
+                  }}
+                  className="px-2.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 text-[10px] font-bold cursor-pointer transition-colors"
+                >
+                  Set
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1 text-[10px]">
+                {[
+                  { label: "2m", ms: 120000, m: "2", s: "0" },
+                  { label: "3m", ms: 180000, m: "3", s: "0" },
+                  { label: "5m", ms: 300000, m: "5", s: "0" },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setCustomTimerR6Min(preset.m);
+                      setCustomTimerR6Sec(preset.s);
+                      handleSetRound6Timer(preset.ms);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={() =>
                   onUpdateState({
@@ -842,27 +1578,101 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                 className="px-4 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1 cursor-pointer"
               >
                 {state.round6TimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-black" />}
-                {state.round6TimerRunning ? "Pause Timer" : "Start Timer"}
+                {state.round6TimerRunning ? "Pause" : "Start"}
               </button>
+
+              <button
+                onClick={() => {
+                  const min = parseInt(customTimerR6Min, 10) || 3;
+                  const sec = parseInt(customTimerR6Sec, 10) || 0;
+                  const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                  handleSetRound6Timer(ms);
+                }}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Reset
+              </button>
+
+              {/* Stage Leaderboard Toggle Button */}
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateState({ round6ShowLeaderboard: !state.round6ShowLeaderboard })
+                }
+                className={`px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-lg cursor-pointer ${
+                  state.round6ShowLeaderboard
+                    ? "bg-amber-500 text-black border-2 border-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.5)] animate-pulse"
+                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
+                }`}
+              >
+                <Trophy className="w-4 h-4" />
+                <span>
+                  {state.round6ShowLeaderboard
+                    ? "Layar Stage: FINAL STANDINGS AKTIF"
+                    : "Tampilkan Final Standings di Stage"}
+                </span>
+              </button>
+
               <button
                 onClick={() =>
                   onUpdateState({
-                    round6TimeRemainingMs: 180000,
-                    round6TimerRunning: false,
-                    round5TimeRemainingMs: 180000,
-                    round5TimerRunning: false,
+                    round6GameEnded: !state.round6GameEnded,
+                    round5GameEnded: !state.round5GameEnded,
+                    round6ShowLeaderboard: true,
                   })
                 }
-                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Reset Timer
-              </button>
-              <button
-                onClick={() => onUpdateState({ round6GameEnded: true, round5GameEnded: true })}
                 className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_20px_rgba(251,191,36,0.5)] cursor-pointer"
               >
-                <PartyPopper className="w-4 h-4" /> End Game & Reveal Winner
+                <PartyPopper className="w-4 h-4" /> {state.round6GameEnded ? "Grand Finale Aktif (Reset)" : "End Game & Reveal Winner"}
               </button>
+            </div>
+          </div>
+
+          {/* Active Wheel Candidates & Reset Button for 5 Finalists */}
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase font-extrabold text-white/70">
+                5 Finalis di Roda Putar Executive Pitch (Tersisa:{" "}
+                <strong className="text-amber-400">
+                  {(
+                    (state.round6SpinNames && state.round6SpinNames.length > 0)
+                      ? state.round6SpinNames
+                      : state.participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6).slice(0, 5).map((p) => p.name)
+                  ).length}
+                </strong>{" "}
+                nama di wheel):
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const top5 = state.participants
+                    .filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6)
+                    .slice(0, 5)
+                    .map((p) => p.name);
+                  onUpdateState({
+                    round6SpinNames: top5,
+                    round6SpunWinners: [],
+                  });
+                }}
+                className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-bold cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3" /> Reset Roda ke 5 Finalis
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+              {((state.round6SpinNames && state.round6SpinNames.length > 0)
+                ? state.round6SpinNames
+                : state.participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6).slice(0, 5).map((p) => p.name)
+              ).map((name, idx) => (
+                <div key={idx} className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/20 text-xs font-semibold text-white/90 flex items-center gap-2 truncate">
+                  <span className="w-5 h-5 rounded-md bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="truncate">{name}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -938,10 +1748,34 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
           </div>
 
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-white/50 font-bold">Current Sub-Round Reward:</span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#8cc63f]/20 text-[#8cc63f] border border-[#8cc63f]/30 font-extrabold">
-              +{currentSubRound.points} pts ({currentSubRound.name})
-            </span>
+            {state.currentRound === 1 ? (
+              <>
+                <span className="text-white/50 font-bold">Sub-Round Reward:</span>
+                <span className="px-2.5 py-1 rounded-lg bg-[#8cc63f]/20 text-[#8cc63f] border border-[#8cc63f]/30 font-extrabold">
+                  +{currentSubRound.points} / -{currentSubRound.points} pts ({currentSubRound.name})
+                </span>
+              </>
+            ) : state.currentRound === 2 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 font-extrabold">
+                Capital Conquest: Pass / Fail Only
+              </span>
+            ) : state.currentRound === 3 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-extrabold">
+                Rootmaster: +20 / -5 pts
+              </span>
+            ) : state.currentRound === 4 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 font-extrabold">
+                Sacred Handoff: +20 / -10 pts
+              </span>
+            ) : state.currentRound === 5 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 font-extrabold">
+                Pressure Chamber: Rubric Scoring (Max 100)
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-extrabold">
+                Executive Pitch: +10 / -10 pts
+              </span>
+            )}
           </div>
         </div>
 
@@ -972,7 +1806,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
               }`}
             >
               Aktif Round Ini ({state.participants.filter((p) => {
-                const isGT = p.isGoldenTicket || GOLDEN_TICKET_NAMES.includes(p.name);
+                const isGT = isGoldenTicket(p);
                 const isEliminated = p.eliminatedInRound !== undefined && p.eliminatedInRound !== null;
                 if (state.currentRound <= 3) return !isGT && !isEliminated;
                 return !isEliminated;
@@ -999,7 +1833,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
               }`}
             >
               <Ticket className="w-3 h-3" />
-              Golden Ticket (3)
+              Golden Ticket ({state.participants.filter((p) => isGoldenTicket(p)).length})
             </button>
           </div>
 
@@ -1050,7 +1884,7 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
             </thead>
             <tbody className="divide-y divide-white/5 text-sm">
               {filteredParticipants.map((p, idx) => {
-                const isGT = p.isGoldenTicket || GOLDEN_TICKET_NAMES.includes(p.name);
+                const isGT = isGoldenTicket(p);
                 const isEliminated = p.eliminatedInRound !== undefined && p.eliminatedInRound !== null;
 
                 return (
@@ -1108,9 +1942,10 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                       <div className="flex items-center gap-3">
                         <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/10 flex-shrink-0 bg-neutral-900">
                           <Image
-                            src={p.avatar || "/participants/khal.webp"}
+                            src={p.avatar || getParticipantPhoto(p.name)}
                             alt={p.name}
                             fill
+                            sizes="36px"
                             className="object-cover"
                           />
                         </div>
@@ -1173,36 +2008,119 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
                       <div className="text-[10px] uppercase text-white/30 font-bold">PTS</div>
                     </td>
 
-                    {/* Add / Remove Points Buttons */}
+                    {/* Add / Remove Points Buttons (Tailored per Game requirement) */}
                     <td className="py-3 px-4 text-center">
-                      <div className="inline-flex items-center gap-1.5">
-                        {/* Add current sub-round point */}
-                        <button
-                          onClick={() => handleScoreChange(p.id, currentSubRound.points)}
-                          title={`Add +${currentSubRound.points} pts`}
-                          className="px-2.5 py-1 rounded-lg bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs flex items-center gap-1 shadow-sm transition-transform active:scale-95 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />+{currentSubRound.points}
-                        </button>
+                      {/* Round 1: +X / -X tailored to active Sub-round (+20/-20, +30/-30, ..., +170/-170) */}
+                      {state.currentRound === 1 && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleScoreChange(p.id, currentSubRound.points)}
+                            title={`Add +${currentSubRound.points} pts`}
+                            className="px-2.5 py-1 rounded-lg bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs flex items-center gap-1 shadow-sm transition-transform active:scale-95 cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />+{currentSubRound.points}
+                          </button>
 
-                        {/* Add +10 */}
-                        <button
-                          onClick={() => handleScoreChange(p.id, 10)}
-                          title="Add +10 pts"
-                          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
-                        >
-                          +10
-                        </button>
+                          <button
+                            onClick={() => handleScoreChange(p.id, -currentSubRound.points)}
+                            title={`Deduct -${currentSubRound.points} pts`}
+                            className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-extrabold text-xs flex items-center gap-1 cursor-pointer"
+                          >
+                            -{currentSubRound.points}
+                          </button>
+                        </div>
+                      )}
 
-                        {/* Deduct -10 */}
-                        <button
-                          onClick={() => handleScoreChange(p.id, -10)}
-                          title="Deduct -10 pts"
-                          className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-bold cursor-pointer"
-                        >
-                          -10
-                        </button>
-                      </div>
+                      {/* Round 2: Poin Ditiadakan (Hanya Pass / Fail) */}
+                      {state.currentRound === 2 && (
+                        <span className="text-[11px] text-white/40 font-mono italic">
+                          Pass / Fail Only
+                        </span>
+                      )}
+
+                      {/* Round 3 Root Master: +20 dan -5 */}
+                      {state.currentRound === 3 && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleScoreChange(p.id, 20)}
+                            title="Add +20 pts"
+                            className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
+                          >
+                            <Plus className="w-3 h-3" />+20
+                          </button>
+
+                          <button
+                            onClick={() => handleScoreChange(p.id, -5)}
+                            title="Deduct -5 pts"
+                            className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-extrabold text-xs flex items-center gap-1 cursor-pointer"
+                          >
+                            -5
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Round 4 Sacred Handoff: +20 / -10 */}
+                      {state.currentRound === 4 && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleScoreChange(p.id, 20)}
+                            title="Add +20 pts"
+                            className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
+                          >
+                            <Plus className="w-3 h-3" />+20
+                          </button>
+
+                          <button
+                            onClick={() => handleScoreChange(p.id, -10)}
+                            title="Deduct -10 pts"
+                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
+                          >
+                            -10
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Round 5 Pressure Chamber: Quick +/- 10 pts */}
+                      {state.currentRound === 5 && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleScoreChange(p.id, 10)}
+                            title="Add +10 pts"
+                            className="px-2 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
+                          >
+                            <Plus className="w-3 h-3" />+10
+                          </button>
+
+                          <button
+                            onClick={() => handleScoreChange(p.id, -10)}
+                            title="Deduct -10 pts"
+                            className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-bold text-xs cursor-pointer"
+                          >
+                            -10
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Round 6 Executive Pitch: Quick +/- 10 pts */}
+                      {state.currentRound === 6 && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleScoreChange(p.id, 10)}
+                            title="Add +10 pts"
+                            className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
+                          >
+                            <Plus className="w-3 h-3" />+10
+                          </button>
+
+                          <button
+                            onClick={() => handleScoreChange(p.id, -10)}
+                            title="Deduct -10 pts"
+                            className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-bold text-xs cursor-pointer"
+                          >
+                            -10
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1211,6 +2129,60 @@ export function AdminConsole({ state, onUpdateState }: AdminConsoleProps) {
           </table>
         </div>
       </div>
+
+      {/* Supabase SQL Setup Modal */}
+      {showSqlModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative glass-panel p-6 sm:p-8 rounded-3xl max-w-2xl w-full border-2 border-[#8cc63f]/60 bg-neutral-950 text-left shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-[#8cc63f]" />
+                <h3 className="font-extrabold text-lg text-white">
+                  Setup Tabel Supabase (Room Architecture)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowSqlModal(false)}
+                className="text-white/40 hover:text-white text-sm font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-white/60 mt-3 flex-shrink-0">
+              Jalankan script SQL ini pada menu <strong>SQL Editor</strong> di dashboard Supabase Anda untuk membuat tabel <code className="text-[#8cc63f]">game_rooms</code>. Seluruh data state tersimpan aman per room code (Room aktif: <strong className="text-white font-mono">{effectiveRoom}</strong>).
+            </p>
+
+            <div className="mt-3 flex-1 min-h-0 bg-neutral-900 rounded-xl border border-white/10 p-3 overflow-y-auto font-mono text-[11px] text-emerald-300 select-all">
+              <pre className="whitespace-pre-wrap">{GAME_ROOMS_SQL_SCHEMA}</pre>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleSeedSupabase}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Reset 26 Pemain Room</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(GAME_ROOMS_SQL_SCHEMA);
+                  setCopiedSql(true);
+                  setTimeout(() => setCopiedSql(false), 3000);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 cursor-pointer shadow-lg"
+              >
+                {copiedSql ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedSql ? "Tersalin ke Clipboard!" : "Salin Script SQL"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

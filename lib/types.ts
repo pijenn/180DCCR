@@ -1,6 +1,14 @@
 export type Round2Status = "pending" | "passed" | "failed";
 export type ParticipantStatus = "active" | "eliminated" | "golden_ticket";
 
+export interface PressureRubric {
+  problemStructuring?: number; // max 30
+  originality?: number;        // max 20
+  adaptability?: number;       // max 20
+  deckQuality?: number;        // max 15
+  executivePresence?: number;  // max 15
+}
+
 export interface Participant {
   id: string;
   name: string;
@@ -9,9 +17,27 @@ export interface Participant {
   score: number;
   round2Status: Round2Status;
   isGoldenTicket?: boolean;
+  golden_ticket?: boolean;
   status?: ParticipantStatus;
   eliminatedInRound?: number | null;
   roundScores?: Record<number, number>;
+  point_gauntlet?: number;
+  point_rootmaster?: number;
+  pressureRubric?: PressureRubric;
+}
+
+export interface PlayerRecord {
+  name: string;
+  point_gauntlet: number;
+  point_rootmaster: number;
+  golden_pass?: boolean;
+  golden_ticket?: boolean;
+  isGoldenTicket?: boolean;
+  eliminated: boolean;
+  university?: string;
+  avatar?: string;
+  round2_status?: string;
+  eliminated_in_round?: number | null;
 }
 
 export interface SubRoundConfig {
@@ -51,6 +77,7 @@ export interface GameState {
   round1Phase: Round1Phase;
   round1TimeRemainingMs: number; // in ms
   round1TimerRunning: boolean;
+  round1TimerEndAt?: number | null;
 
   // Round 2 state (Capital Conquest)
   round2TargetAnswer: number;
@@ -60,12 +87,14 @@ export interface GameState {
   round3TimeRemainingMs: number;
   round3TimerRunning: boolean;
   round3InitialMs: number;
+  round3TimerEndAt?: number | null;
 
   // Round 4 state (Sacred Handoff)
   round4TimeRemainingMs: number;
   round4TimerRunning: boolean;
   round4SpinNames?: string[];
   round4SelectedWinner?: string | null;
+  round4TimerEndAt?: number | null;
 
   // Round 5 state (Pressure Chamber)
   round5SpinNames: string[];
@@ -73,6 +102,9 @@ export interface GameState {
   round5TimeRemainingMs: number;
   round5TimerRunning: boolean;
   round5GameEnded?: boolean;
+  round5TimerEndAt?: number | null;
+  round5ShowLeaderboard?: boolean;
+  round5SpunWinners?: string[];
 
   // Round 6 state (Executive Pitch)
   round6SpinNames?: string[];
@@ -80,6 +112,9 @@ export interface GameState {
   round6TimeRemainingMs?: number;
   round6TimerRunning?: boolean;
   round6GameEnded?: boolean;
+  round6TimerEndAt?: number | null;
+  round6ShowLeaderboard?: boolean;
+  round6SpunWinners?: string[];
 
   // Participants map or list
   participants: Participant[];

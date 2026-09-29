@@ -17,33 +17,105 @@ export const GOLDEN_TICKET_NAMES = [
   "Ahmad Reva Dany Fawwaz",
 ];
 
+export function isGoldenTicket(p?: Participant | null): boolean {
+  if (!p) return false;
+  return Boolean(
+    p.isGoldenTicket ||
+    p.golden_ticket ||
+    (p as any).golden_pass ||
+    p.status === "golden_ticket" ||
+    GOLDEN_TICKET_NAMES.includes(p.name)
+  );
+}
+
+export const PARTICIPANT_PHOTO_MATCHERS = [
+  { match: ["theresia", "rosma"], file: "2_Theresia Rosma Exaudi.jpg.jpeg" },
+  { match: ["abdullah", "shamil"], file: "Abdullah Shamil Basayev.webp" },
+  { match: ["achmad", "muchtarom", "achsan"], file: "Achmad Muchtarom Achsan.jpg" },
+  { match: ["ahmad", "reva"], file: "Ahmad Reva.jpeg" },
+  { match: ["alvyan"], file: "Alvyan Ananta Asis.jpg" },
+  { match: ["ngurah", "anak agung"], file: "Anak Agung Ngurah.jpeg" },
+  { match: ["cyka"], file: "Cyka Humaera.JPG" },
+  { match: ["diva"], file: "Diva Salsabilla.jpeg" },
+  { match: ["fachri"], file: "Fachri Fabian.jpeg" },
+  { match: ["faris", "audah", "khalilullah", "faiz"], file: "Faris Audah.jpeg" },
+  { match: ["hanindita", "hanandita"], file: "Hanandita Fernanda Elsharini.JPG" },
+  { match: ["hilmi"], file: "Hilmi Hidayat.webp" },
+  { match: ["ihsan"], file: "Ihsan Dianta.jpeg" },
+  { match: ["jesslyn"], file: "Jesslyn Callista.jpeg" },
+  { match: ["kelvin"], file: "Kelvin William.jpeg" },
+  { match: ["fikri", "ali fikri"], file: "Mohammad Ali Fikri.png" },
+  { match: ["yafis"], file: "Muchamad Yafis (1).png" },
+  { match: ["fajar"], file: "Muhammad Fajar.jpeg" },
+  { match: ["nafi"], file: "Nafi Satul.webp" },
+  { match: ["naufal"], file: "Naufal Arya.jpeg" },
+  { match: ["nindya", "nindiya"], file: "Nindiya Aliyah.jpg" },
+  { match: ["rachelle"], file: "Rachelle H.jpeg" },
+  { match: ["rexelnino"], file: "Rexelnino.jpg" },
+  { match: ["rifqi"], file: "Rifqi Syarifuddin (1).png" },
+  { match: ["sharlyf"], file: "Sharlyf Shaquille Syani.jpg" },
+  { match: ["surya", "sura"], file: "Sura Rahmat Fatahillah (1).png" }
+];
+
+export function getParticipantPhoto(name?: string | null): string {
+  if (!name) return "/participants/default-avatar.svg";
+  const lower = name.toLowerCase().trim();
+  for (const entry of PARTICIPANT_PHOTO_MATCHERS) {
+    if (entry.match.some((m) => lower.includes(m))) {
+      return `/participants/${entry.file}`;
+    }
+  }
+  return "/participants/default-avatar.svg";
+}
+
+export function getParticipantPhotoPosition(name?: string | null): string {
+  if (!name) return "center 20%";
+  const lower = name.toLowerCase().trim();
+  // Specifically adjust position for participants whose heads get cut off if centered too low
+  if (
+    lower.includes("abdullah") ||
+    lower.includes("shamil") ||
+    lower.includes("achmad") ||
+    lower.includes("muchtarom") ||
+    lower.includes("sharlyf") ||
+    lower.includes("shaquille") ||
+    lower.includes("rexelino") ||
+    lower.includes("rexelnino") ||
+    lower.includes("theresia") ||
+    lower.includes("rosma")
+  ) {
+    return "center 5%"; // Focus near the very top to preserve full head & hair
+  }
+  return "center 20%";
+}
+
 export const DEFAULT_PARTICIPANTS: Participant[] = [
-  { id: "p-01", name: "Rifqi Syarifuddin Yasykur", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", isGoldenTicket: true, status: "golden_ticket" },
-  { id: "p-02", name: "Mohammad Ali Fikri", university: "Universitas Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-03", name: "Cyka Srihana Humaera", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", isGoldenTicket: true, status: "golden_ticket" },
-  { id: "p-04", name: "Alvyan Ananta Asis", university: "Universitas Airlangga", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-05", name: "Mohammad Hilmi Hidayatullah", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-06", name: "Diva Salsabilla", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-07", name: "Muchamad Yafis", university: "Universitas Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-08", name: "Fachri Fabian", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-09", name: "Nafi Satul Fuadhah", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-10", name: "Ngurah Oka", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-11", name: "Rachelle Hasiane", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-12", name: "Ihsan Dianta", university: "Institut Teknologi Sepuluh Nopember", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-13", name: "Ahmad Reva Dany Fawwaz", university: "UNAIR", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", isGoldenTicket: true, status: "golden_ticket" },
-  { id: "p-14", name: "M. Fajar Akbar Nugeraha", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-15", name: "Surya Rahmat Fatahillah", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-16", name: "Naufal Aryasatya", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-17", name: "Theresia Rosma Exaudi", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-18", name: "Abdullah Shamil Basayev", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-19", name: "Jesslyn Callista", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-20", name: "Nindya Aliyah Maulidina", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-21", name: "Sharlyf Shaquille Syani", university: "Politeknik Negeri Malang", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-22", name: "Rexelnino Rajendra", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-23", name: "Hanindita Fernanda Elsharini", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-24", name: "Kelvin William", university: "Universitas Ciputra", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-25", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
-  { id: "p-26", name: "Khalilullah Al-Faiz", university: "180 Degrees Consulting UB", avatar: "/participants/khal.webp", score: 0, round2Status: "pending", status: "active" },
+  { id: "p-01", name: "Rifqi Syarifuddin Yasykur", university: "Institut Teknologi Sepuluh Nopember", avatar: getParticipantPhoto("Rifqi Syarifuddin Yasykur"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", isGoldenTicket: true, golden_ticket: true, status: "golden_ticket" },
+  { id: "p-02", name: "Mohammad Ali Fikri", university: "Universitas Malang", avatar: getParticipantPhoto("Mohammad Ali Fikri"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-03", name: "Cyka Srihana Humaera", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Cyka Srihana Humaera"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", isGoldenTicket: true, golden_ticket: true, status: "golden_ticket" },
+  { id: "p-04", name: "Alvyan Ananta Asis", university: "Universitas Airlangga", avatar: getParticipantPhoto("Alvyan Ananta Asis"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-05", name: "Mohammad Hilmi Hidayatullah", university: "Institut Teknologi Sepuluh Nopember", avatar: getParticipantPhoto("Mohammad Hilmi Hidayatullah"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-06", name: "Diva Salsabilla", university: "Politeknik Negeri Malang", avatar: getParticipantPhoto("Diva Salsabilla"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-07", name: "Muchamad Yafis", university: "Universitas Malang", avatar: getParticipantPhoto("Muchamad Yafis"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-08", name: "Fachri Fabian", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: getParticipantPhoto("Fachri Fabian"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-09", name: "Nafi Satul Fuadhah", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Nafi Satul Fuadhah"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-10", name: "Ngurah Oka", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Ngurah Oka"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-11", name: "Rachelle Hasiane", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Rachelle Hasiane"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-12", name: "Ihsan Dianta", university: "Institut Teknologi Sepuluh Nopember", avatar: getParticipantPhoto("Ihsan Dianta"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-13", name: "Ahmad Reva Dany Fawwaz", university: "UNAIR", avatar: getParticipantPhoto("Ahmad Reva Dany Fawwaz"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", isGoldenTicket: true, golden_ticket: true, status: "golden_ticket" },
+  { id: "p-14", name: "M. Fajar Akbar Nugeraha", university: "Universitas Brawijaya", avatar: getParticipantPhoto("M. Fajar Akbar Nugeraha"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-15", name: "Surya Rahmat Fatahillah", university: "Politeknik Negeri Malang", avatar: getParticipantPhoto("Surya Rahmat Fatahillah"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-16", name: "Naufal Aryasatya", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Naufal Aryasatya"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-17", name: "Theresia Rosma Exaudi", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Theresia Rosma Exaudi"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-18", name: "Abdullah Shamil Basayev", university: "Politeknik Negeri Malang", avatar: getParticipantPhoto("Abdullah Shamil Basayev"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-19", name: "Jesslyn Callista", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Jesslyn Callista"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-20", name: "Nindya Aliyah Maulidina", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: getParticipantPhoto("Nindya Aliyah Maulidina"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-21", name: "Sharlyf Shaquille Syani", university: "Politeknik Negeri Malang", avatar: getParticipantPhoto("Sharlyf Shaquille Syani"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-22", name: "Rexelnino Rajendra", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Rexelnino Rajendra"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-23", name: "Hanindita Fernanda Elsharini", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Hanindita Fernanda Elsharini"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-24", name: "Kelvin William", university: "Universitas Ciputra", avatar: getParticipantPhoto("Kelvin William"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-25", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Achmad Muchtarom Achsany"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-26", name: "Khalilullah Al-Faiz", university: "180 Degrees Consulting UB", avatar: getParticipantPhoto("Khalilullah Al-Faiz"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
 ];
 
 export function getSubRoundPointValue(subRoundIdx: number): number {
@@ -535,7 +607,7 @@ export function getActiveRoundParticipants(
   if (roundNum <= 3) {
     // Rounds 1-3: Non-golden ticket participants who haven't been eliminated
     return participants.filter(
-      (p) => !p.isGoldenTicket && (p.eliminatedInRound === undefined || p.eliminatedInRound === null)
+      (p) => !isGoldenTicket(p) && (p.eliminatedInRound === undefined || p.eliminatedInRound === null)
     );
   }
   // Round 4+: all participants who haven't been eliminated (including 3 Golden Ticket holders who join now!)
@@ -565,7 +637,7 @@ export function reinstateParticipant(
     if (p.id === participantId) {
       return {
         ...p,
-        status: p.isGoldenTicket ? "golden_ticket" : "active",
+        status: isGoldenTicket(p) ? "golden_ticket" : "active",
         eliminatedInRound: null,
       };
     }
@@ -621,7 +693,7 @@ export function getInitialGameState(): GameState {
     round4TimeRemainingMs: 300000,
     round4TimerRunning: false,
 
-    round5SpinNames: top5Names,
+    round5SpinNames: top9Names,
     round5SelectedWinner: null,
     round5TimeRemainingMs: 60000,
     round5TimerRunning: false,
@@ -639,11 +711,34 @@ export function getInitialGameState(): GameState {
   };
 }
 
-export function applyScoreChange(participants: Participant[], participantId: string, delta: number): Participant[] {
+export function applyScoreChange(
+  participants: Participant[],
+  participantId: string,
+  delta: number,
+  currentRound: number = 1
+): Participant[] {
   return participants.map((p) => {
     if (p.id === participantId) {
       const newScore = Math.max(0, p.score + delta);
-      return { ...p, score: newScore };
+      const roundScores = { ...(p.roundScores || {}) };
+      roundScores[currentRound] = Math.max(0, (roundScores[currentRound] || 0) + delta);
+
+      let point_gauntlet = p.point_gauntlet ?? roundScores[1] ?? (currentRound === 1 ? newScore : 0);
+      let point_rootmaster = p.point_rootmaster ?? roundScores[3] ?? 0;
+
+      if (currentRound === 1) {
+        point_gauntlet = Math.max(0, point_gauntlet + delta);
+      } else if (currentRound === 3) {
+        point_rootmaster = Math.max(0, point_rootmaster + delta);
+      }
+
+      return {
+        ...p,
+        score: newScore,
+        roundScores,
+        point_gauntlet,
+        point_rootmaster,
+      };
     }
     return p;
   });
@@ -716,7 +811,10 @@ export function getPrevQuestionState(
   return { subRoundIndex: 0, questionIndex: 0 };
 }
 
-export function getNextRound1Phase(currentPhase: Round1Phase): Round1Phase {
+export function getNextRound1Phase(
+  currentPhase: Round1Phase,
+  isEndOfSubRound: boolean = true
+): Round1Phase {
   switch (currentPhase) {
     case "idle":
     case "question_timer":
@@ -726,7 +824,7 @@ export function getNextRound1Phase(currentPhase: Round1Phase): Round1Phase {
     case "answering":
       return "correct_answer";
     case "correct_answer":
-      return "leaderboard";
+      return isEndOfSubRound ? "leaderboard" : "question_timer";
     case "leaderboard":
       return "question_timer";
     default:
