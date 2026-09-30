@@ -77,6 +77,8 @@ export function Round2CapitalConquest({
     setSubmissionError(null);
 
     const isCorrect = validateRound2Answer(inputVal, targetAnswer);
+    // Clear input field whether wrong or right
+    setInputVal("");
 
     if (isCorrect) {
       triggerConfetti();

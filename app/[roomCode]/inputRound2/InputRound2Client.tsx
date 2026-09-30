@@ -98,6 +98,8 @@ export function InputRound2Client({ roomCode }: InputRound2ClientProps) {
     setSubmissionError(null);
 
     const isCorrect = validateRound2Answer(answerInput, gameState.round2TargetAnswer);
+    // Clear input field whether wrong or right
+    setAnswerInput("");
 
     if (isCorrect) {
       triggerConfetti();

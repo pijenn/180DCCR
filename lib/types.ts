@@ -53,6 +53,7 @@ export interface Question {
   subRoundId: number;
   questionNumber: number;
   prompt: string;
+  imageUrl?: string;
   options: {
     key: "A" | "B" | "C" | "D" | "E" | "F";
     text: string;

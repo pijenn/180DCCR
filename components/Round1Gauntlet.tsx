@@ -268,22 +268,22 @@ export function Round1Gauntlet({
       {/* 2. Main Content Area Switcher */}
       <main className="flex-1 flex flex-col justify-center my-auto py-6 sm:py-8 w-full">
         {/* ============================================================ */}
-        {/* FLOW STEP 1: Questions & Timer (Only Question and Timer) */}
+        {/* FLOW STEP 1: Questions & Timer (Only Question, Image & Timer) */}
         {/* ============================================================ */}
         {normalizedPhase === "question_timer" && (
-          <div className="space-y-8 max-w-4xl mx-auto w-full text-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="space-y-4 sm:space-y-6 max-w-5xl mx-auto w-full text-center animate-in fade-in zoom-in-95 duration-300 my-auto py-2">
             {/* Minimalist Digital Countdown Timer */}
             <div className="inline-flex flex-col items-center">
-              <div className="flex items-center gap-3 px-8 py-3 rounded-full bg-white/[0.04] border border-white/10 backdrop-blur-md shadow-lg">
+              <div className="flex items-center gap-3 px-6 sm:px-8 py-2 sm:py-2.5 rounded-full bg-white/[0.04] border border-white/10 backdrop-blur-md shadow-lg">
                 <Clock
-                  className={`w-6 h-6 ${
+                  className={`w-5 h-5 sm:w-6 sm:h-6 ${
                     timeRemainingMs <= 5000 && timerRunning
                       ? "text-red-500 animate-pulse"
                       : "text-amber-400"
                   }`}
                 />
                 <span
-                  className={`font-mono text-4xl sm:text-5xl font-black tracking-widest ${
+                  className={`font-mono text-3xl sm:text-4xl md:text-5xl font-black tracking-widest ${
                     timeRemainingMs <= 5000 && timerRunning
                       ? "text-red-500 animate-pulse"
                       : "text-white"
@@ -294,7 +294,7 @@ export function Round1Gauntlet({
               </div>
 
               {/* Minimalist Progress Line */}
-              <div className="w-64 sm:w-80 bg-white/10 h-1.5 rounded-full overflow-hidden mt-4">
+              <div className="w-56 sm:w-72 bg-white/10 h-1.5 rounded-full overflow-hidden mt-2.5">
                 <div
                   className={`h-full transition-all duration-100 ${
                     timeRemainingMs <= 5000 ? "bg-red-500" : "bg-[#8cc63f]"
@@ -304,11 +304,24 @@ export function Round1Gauntlet({
               </div>
             </div>
 
-            {/* Question Prompt (Clear & Prominent) */}
-            <div className="py-6 sm:py-10">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-relaxed tracking-tight max-w-3xl mx-auto">
+            {/* Optional Question Chart / Diagram Image */}
+            {currentQuestion.imageUrl && (
+              <div className="relative w-full max-w-2xl h-48 sm:h-60 md:h-72 mx-auto rounded-xl overflow-hidden border border-white/15 bg-black/50 shadow-2xl">
+                <Image
+                  src={currentQuestion.imageUrl}
+                  alt={`Chart Soal ${questionIndex + 1}`}
+                  fill
+                  className="object-contain p-2"
+                  priority
+                />
+              </div>
+            )}
+
+            {/* Question Prompt (Compact, Clean & Highly Legible) */}
+            <div className="max-w-4xl mx-auto px-2">
+              <p className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-white/95 leading-relaxed tracking-normal whitespace-pre-line text-center">
                 {currentQuestion.prompt}
-              </h2>
+              </p>
             </div>
           </div>
         )}
@@ -317,20 +330,20 @@ export function Round1Gauntlet({
         {/* FLOW STEP 2: Questions, Timer, Options */}
         {/* ============================================================ */}
         {normalizedPhase === "question_options" && (
-          <div className="space-y-6 max-w-5xl mx-auto w-full animate-in fade-in duration-300">
+          <div className="space-y-4 max-w-5xl mx-auto w-full animate-in fade-in duration-300 my-auto py-2">
             {/* Question & Timer Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
-              <div className="text-center sm:text-left flex-1">
-                <div className="text-[11px] uppercase font-bold tracking-widest text-[#8cc63f] mb-1">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="text-center sm:text-left flex-1 min-w-0">
+                <div className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest text-[#8cc63f] mb-0.5">
                   Pertanyaan #{questionIndex + 1}:
                 </div>
-                <h3 className="text-base sm:text-xl font-bold text-white line-clamp-3">
+                <p className="text-xs sm:text-sm md:text-base font-semibold text-white/90 line-clamp-3 leading-snug whitespace-pre-line">
                   {currentQuestion.prompt}
-                </h3>
+                </p>
               </div>
 
               {/* Digital Timer */}
-              <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex-shrink-0">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 flex-shrink-0">
                 <Clock
                   className={`w-4 h-4 ${
                     timeRemainingMs <= 5000 && timerRunning
@@ -339,7 +352,7 @@ export function Round1Gauntlet({
                   }`}
                 />
                 <span
-                  className={`font-mono text-2xl font-black ${
+                  className={`font-mono text-xl sm:text-2xl font-black ${
                     timeRemainingMs <= 5000 && timerRunning
                       ? "text-red-500 animate-pulse"
                       : "text-white"
@@ -350,44 +363,55 @@ export function Round1Gauntlet({
               </div>
             </div>
 
-            {/* Options Grid (A - F) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            {/* Optional Question Chart / Diagram Image */}
+            {currentQuestion.imageUrl && (
+              <div className="relative w-full max-w-xl h-40 sm:h-52 mx-auto rounded-xl overflow-hidden border border-white/15 bg-black/50 shadow-lg">
+                <Image
+                  src={currentQuestion.imageUrl}
+                  alt={`Chart Soal ${questionIndex + 1}`}
+                  fill
+                  className="object-contain p-2"
+                  priority
+                />
+              </div>
+            )}
+
+            {/* Options Display Grid (Contestants cannot pick - View only) */}
+            <div
+              className={`grid gap-2.5 sm:gap-3 ${
+                currentQuestion.options.length <= 2
+                  ? "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto"
+                  : "grid-cols-1 md:grid-cols-2"
+              }`}
+            >
               {currentQuestion.options.map((option) => {
-                const isSelected = activeAnswer === option.key;
+                const isTrueFalse = currentQuestion.options.length <= 2;
 
                 return (
-                  <button
+                  <div
                     key={option.key}
-                    type="button"
-                    onClick={() => handleOptionClick(option.key)}
-                    className={`p-4 rounded-2xl text-left border transition-all flex items-start gap-3.5 group cursor-pointer ${
-                      isSelected
-                        ? "bg-[#8cc63f]/20 border-[#8cc63f] shadow-[0_0_20px_rgba(140,198,63,0.3)] scale-[1.01]"
-                        : "bg-white/[0.03] hover:bg-white/[0.07] border-white/10 hover:border-white/30"
+                    className={`rounded-xl text-left border bg-white/[0.03] border-white/10 flex items-start gap-3 select-none ${
+                      isTrueFalse ? "p-4 sm:p-5" : "p-3 sm:p-3.5"
                     }`}
                   >
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0 transition-transform group-hover:scale-105 ${
-                        isSelected
-                          ? "bg-[#8cc63f] text-black"
-                          : "bg-white/10 text-white/90 group-hover:bg-white/20"
+                      className={`rounded-lg flex items-center justify-center font-black flex-shrink-0 bg-white/10 text-white/90 ${
+                        isTrueFalse ? "w-9 h-9 text-sm" : "w-7 h-7 text-xs"
                       }`}
                     >
                       {option.key}
                     </div>
 
-                    <div className="flex-grow pt-1 min-w-0">
-                      <p className="text-sm sm:text-base font-medium text-white/90 group-hover:text-white leading-snug">
+                    <div className="flex-grow pt-0.5 min-w-0">
+                      <p
+                        className={`font-medium text-white/90 leading-snug ${
+                          isTrueFalse ? "text-base sm:text-lg font-semibold" : "text-xs sm:text-sm"
+                        }`}
+                      >
                         {option.text}
                       </p>
                     </div>
-
-                    {isSelected && (
-                      <div className="flex-shrink-0 text-[#8cc63f] pt-1">
-                        <CheckCircle2 className="w-5 h-5" />
-                      </div>
-                    )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -398,33 +422,57 @@ export function Round1Gauntlet({
         {/* FLOW STEP 3: Correct Answer Revealed */}
         {/* ============================================================ */}
         {normalizedPhase === "correct_answer" && (
-          <div className="space-y-6 max-w-5xl mx-auto w-full animate-in fade-in zoom-in-95 duration-300">
+          <div className="space-y-4 max-w-5xl mx-auto w-full animate-in fade-in zoom-in-95 duration-300 my-auto py-2">
             {/* Question Summary */}
             <div className="text-center max-w-3xl mx-auto">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#8cc63f]/20 text-[#8cc63f] border border-[#8cc63f]/40 mb-3 shadow-[0_0_15px_rgba(140,198,63,0.2)]">
-                <CheckCircle2 className="w-4 h-4" /> Kunci Jawaban Resmi Terbuka
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#8cc63f]/20 text-[#8cc63f] border border-[#8cc63f]/40 mb-2 shadow-[0_0_15px_rgba(140,198,63,0.2)]">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Kunci Jawaban Resmi Terbuka
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-white leading-relaxed">
+              <p className="text-xs sm:text-sm md:text-base font-semibold text-white/90 leading-snug whitespace-pre-line max-h-24 overflow-y-auto">
                 {currentQuestion.prompt}
-              </h3>
+              </p>
             </div>
 
+            {/* Optional Question Chart / Diagram Image */}
+            {currentQuestion.imageUrl && (
+              <div className="relative w-full max-w-xl h-36 sm:h-48 mx-auto rounded-xl overflow-hidden border border-white/15 bg-black/50 shadow-lg">
+                <Image
+                  src={currentQuestion.imageUrl}
+                  alt={`Chart Soal ${questionIndex + 1}`}
+                  fill
+                  className="object-contain p-2"
+                  priority
+                />
+              </div>
+            )}
+
             {/* Options with Correct Answer Highlighted & Others Dimmed */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <div
+              className={`grid gap-2.5 sm:gap-3 ${
+                currentQuestion.options.length <= 2
+                  ? "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto"
+                  : "grid-cols-1 md:grid-cols-2"
+              }`}
+            >
               {currentQuestion.options.map((option) => {
                 const isCorrect = option.key === currentQuestion.correctAnswer;
+                const isTrueFalse = currentQuestion.options.length <= 2;
 
                 return (
                   <div
                     key={option.key}
-                    className={`p-4 sm:p-5 rounded-2xl text-left border transition-all flex items-start gap-4 relative overflow-hidden ${
+                    className={`rounded-xl text-left border transition-all flex items-start gap-3 relative overflow-hidden select-none ${
+                      isTrueFalse ? "p-4 sm:p-5" : "p-3 sm:p-3.5"
+                    } ${
                       isCorrect
-                        ? "bg-[#8cc63f]/20 border-2 border-[#8cc63f] shadow-[0_0_35px_rgba(140,198,63,0.35)] scale-[1.02] z-10"
+                        ? "bg-[#8cc63f]/20 border-2 border-[#8cc63f] shadow-[0_0_35px_rgba(140,198,63,0.35)] scale-[1.01] z-10"
                         : "bg-white/[0.02] border-white/5 opacity-25"
                     }`}
                   >
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-base flex-shrink-0 ${
+                      className={`rounded-lg flex items-center justify-center font-black flex-shrink-0 ${
+                        isTrueFalse ? "w-9 h-9 text-sm" : "w-7 h-7 text-xs"
+                      } ${
                         isCorrect
                           ? "bg-[#8cc63f] text-black shadow-md"
                           : "bg-white/10 text-white/60"
@@ -434,17 +482,17 @@ export function Round1Gauntlet({
                     </div>
 
                     <div className="flex-grow pt-0.5 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-0.5">
                         {isCorrect && (
-                          <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded bg-[#8cc63f] text-black tracking-wider">
+                          <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-[#8cc63f] text-black tracking-wider">
                             JAWABAN BENAR
                           </span>
                         )}
                       </div>
                       <p
-                        className={`text-sm sm:text-base font-semibold leading-snug ${
-                          isCorrect ? "text-white" : "text-white/60"
-                        }`}
+                        className={`font-semibold leading-snug ${
+                          isTrueFalse ? "text-base sm:text-lg" : "text-xs sm:text-sm"
+                        } ${isCorrect ? "text-white font-bold" : "text-white/60"}`}
                       >
                         {option.text}
                       </p>
@@ -452,7 +500,7 @@ export function Round1Gauntlet({
 
                     {isCorrect && (
                       <div className="flex-shrink-0 text-[#8cc63f]">
-                        <CheckCircle2 className="w-6 h-6" />
+                        <CheckCircle2 className="w-5 h-5" />
                       </div>
                     )}
                   </div>
