@@ -2,7 +2,13 @@
 
 import Image from "next/image";
 import { Participant } from "../lib/types.ts";
-import { calculateLeaderboard, getParticipantPhoto, getParticipantPhotoPosition, isGoldenTicket } from "../lib/gameEngine.ts";
+import {
+  calculateLeaderboard,
+  getParticipantPhoto,
+  getParticipantPhotoPosition,
+  isGoldenTicket,
+  getActiveRoundParticipants,
+} from "../lib/gameEngine.ts";
 import { Trophy, Medal, Award, Sparkles } from "lucide-react";
 
 interface KahootLeaderboardProps {
@@ -18,11 +24,10 @@ export function KahootLeaderboard({
   highlightTop = true,
   currentRound,
 }: KahootLeaderboardProps) {
-  // In rounds 1-3, golden ticket holders do not play and are not shown on the leaderboard
-  const eligibleParticipants =
-    currentRound && currentRound <= 3
-      ? participants.filter((p) => !isGoldenTicket(p))
-      : participants;
+  // Exclude eliminated participants and (for rounds 1-3) golden ticket holders
+  const eligibleParticipants = currentRound
+    ? getActiveRoundParticipants(participants, currentRound)
+    : participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null);
 
   const ranked = calculateLeaderboard(eligibleParticipants);
   const displayList = maxDisplay ? ranked.slice(0, maxDisplay) : ranked;

@@ -2,10 +2,17 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Participant } from "../lib/types.ts";
-import { formatTimerDisplay, getParticipantPhoto, getParticipantPhotoPosition } from "../lib/gameEngine.ts";
+import { Participant, StageViewMode } from "../lib/types.ts";
+import {
+  formatPrecisionCountdown,
+  formatTimerDisplay,
+  calculateLeaderboard,
+  getParticipantPhoto,
+  getParticipantPhotoPosition,
+  getActiveRoundParticipants,
+} from "../lib/gameEngine.ts";
 import { playWheelClick, playSuccessFanfare, playTick, playHurryTick, playBuzzer } from "../lib/audio.ts";
-import { Disc3, Clock, Play, Pause, RotateCcw, Flame, UserCheck, Plus, Minus, Trophy, CheckCircle2, Sparkles, LayoutGrid } from "lucide-react";
+import { Disc3, Trophy, CheckCircle2, UserCheck, Sparkles, Clock } from "lucide-react";
 
 interface Round4PressureChamberProps {
   spinNames: string[];
@@ -16,14 +23,11 @@ interface Round4PressureChamberProps {
   soundEnabled?: boolean;
   isAdmin?: boolean;
   showLeaderboard?: boolean;
+  viewMode?: StageViewMode;
   spunWinners?: string[];
   onSpinEnd?: (winnerName: string) => void;
-  onStartTimer?: () => void;
-  onPauseTimer?: () => void;
-  onResetTimer?: () => void;
-  onSetTimerSeconds?: (secs: number) => void;
-  onScoreChange?: (participantId: string, delta: number) => void;
   onToggleLeaderboard?: () => void;
+  onSetViewMode?: (mode: StageViewMode) => void;
 }
 
 export function Round4PressureChamber({
@@ -35,14 +39,11 @@ export function Round4PressureChamber({
   soundEnabled = true,
   isAdmin = false,
   showLeaderboard = false,
+  viewMode = "wheel",
   spunWinners = [],
   onSpinEnd,
-  onStartTimer,
-  onPauseTimer,
-  onResetTimer,
-  onSetTimerSeconds,
-  onScoreChange,
   onToggleLeaderboard,
+  onSetViewMode,
 }: Round4PressureChamberProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -50,11 +51,18 @@ export function Round4PressureChamber({
   const rotationRef = useRef(0);
   const animFrameRef = useRef<number | null>(null);
 
-  // Remaining active candidates on the wheel (exclude already spun winners if available)
+  // Active contenders in Pressure Chamber (top 9 active contenders for Round 5)
+  const chamberCandidates = getActiveRoundParticipants(participants, 5).slice(0, 9);
+  const eligibleNamesSet = new Set(chamberCandidates.map((p) => p.name));
+
+  // Remaining active candidates on the wheel (strictly excluding any eliminated participants)
   const activeNames =
     spinNames && spinNames.length > 0
-      ? spinNames
-      : participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name);
+      ? spinNames.filter((n) => eligibleNamesSet.has(n))
+      : chamberCandidates.map((p) => p.name);
+
+  // Ranked Pressure Chamber Candidates by accumulated score
+  const rankedChamber = calculateLeaderboard(chamberCandidates);
 
   // Draw the wheel on canvas
   const drawWheel = useCallback((angle: number) => {
@@ -146,20 +154,14 @@ export function Round4PressureChamber({
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Center hub
+    // Center hub background circle (Center logo will be overlaid crisp on top)
     ctx.beginPath();
-    ctx.arc(0, 0, 28, 0, 2 * Math.PI);
+    ctx.arc(0, 0, 32, 0, 2 * Math.PI);
     ctx.fillStyle = "#0c0314";
     ctx.fill();
     ctx.strokeStyle = "#c084fc";
     ctx.lineWidth = 3;
     ctx.stroke();
-
-    ctx.fillStyle = "#c084fc";
-    ctx.font = "900 13px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("180", 0, 0);
 
     ctx.restore();
 
@@ -236,7 +238,7 @@ export function Round4PressureChamber({
     animFrameRef.current = requestAnimationFrame(animate);
   };
 
-  const secLeft = Math.floor(timeRemainingMs / 1000);
+  const totalSec = Math.floor(timeRemainingMs / 1000);
   const lastPlayedSecRef = useRef<number>(-1);
 
   // Timer audio
@@ -245,179 +247,139 @@ export function Round4PressureChamber({
       lastPlayedSecRef.current = -1;
       return;
     }
-    if (secLeft !== lastPlayedSecRef.current) {
-      lastPlayedSecRef.current = secLeft;
-      if (secLeft <= 5 && secLeft > 0) {
+    if (totalSec !== lastPlayedSecRef.current) {
+      lastPlayedSecRef.current = totalSec;
+      if (totalSec <= 10 && totalSec > 0) {
         playHurryTick(soundEnabled);
-      } else if (secLeft > 0) {
+      } else if (totalSec > 0) {
         playTick(soundEnabled);
-      } else if (secLeft === 0) {
+      } else if (totalSec === 0) {
         playBuzzer(soundEnabled);
       }
     }
-  }, [secLeft, timerRunning, soundEnabled]);
+  }, [totalSec, timerRunning, soundEnabled]);
 
-  // Ranked Pressure Chamber Candidates (All 9 contenders for Round 5)
-  const chamberCandidates = participants
-    .filter((p) => !p.isGoldenTicket && (p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 5))
-    .slice(0, 9)
-    .map((p) => {
-      const rubric = p.pressureRubric || {};
-      const ps = rubric.problemStructuring ?? 0;
-      const orig = rubric.originality ?? 0;
-      const adapt = rubric.adaptability ?? 0;
-      const deck = rubric.deckQuality ?? 0;
-      const exec = rubric.executivePresence ?? 0;
-      const totalRubric = ps + orig + adapt + deck + exec;
-      const effectiveScore = totalRubric > 0 ? totalRubric : p.score;
-      return {
-        ...p,
-        rubric: { ps, orig, adapt, deck, exec },
-        calculatedScore: effectiveScore,
-      };
-    })
-    .sort((a, b) => b.calculatedScore - a.calculatedScore);
+  const isLowTime = timeRemainingMs <= 30000 && timeRemainingMs > 0;
+  const isCriticalTime = timeRemainingMs <= 10000 && timeRemainingMs > 0;
 
-  // --------------------------------------------------------------------------
-  // LEADERBOARD VIEW (Image 2 style with Image 1 rubric headers)
-  // --------------------------------------------------------------------------
-  if (showLeaderboard) {
+  const effectiveMode = showLeaderboard ? "leaderboard" : viewMode;
+
+  // =========================================================================
+  // 1. LEADERBOARD VIEW (All 9 participants with accumulated scores)
+  // =========================================================================
+  if (effectiveMode === "leaderboard") {
     return (
-      <div className="w-full h-full flex flex-col justify-between max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 select-none animate-in fade-in duration-300">
-        {/* Header Bar */}
+      <div className="w-full h-full flex flex-col justify-between max-w-7xl mx-auto overflow-hidden animate-in fade-in duration-300">
+        {/* Header - Only Pressure Chamber */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-shrink-0">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-bold uppercase tracking-wider bg-[#7A00B8]/30 text-[#c084fc] border border-[#7A00B8]/50">
-                <Trophy className="w-4 h-4" /> Round 05 • Pressure Chamber
-              </span>
-              <span className="text-xs font-mono text-white/50 hidden sm:inline">
-                Evaluation Rubric & Final Standings
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase mt-1 font-sans">
-              Pressure Chamber Official Standings
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase font-sans">
+              PRESSURE CHAMBER
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="px-3.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Top 5 Maju ke Final (Executive Pitch)</span>
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-mono font-bold">
+              <Trophy className="w-4 h-4" />
+              <span>9 Kontender</span>
             </div>
-
-            {isAdmin && onToggleLeaderboard && (
+            {onToggleLeaderboard && (
               <button
                 type="button"
                 onClick={onToggleLeaderboard}
-                className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
               >
-                <Disc3 className="w-3.5 h-3.5 text-[#c084fc]" />
-                <span>Kembali ke Spin Wheel</span>
+                <Disc3 className="w-3.5 h-3.5 text-purple-300" />
+                <span>Roda Putar</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* TV Show Broadcaster Leaderboard Table (Image 2 design with Image 1 titles) */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto rounded-2xl bg-[#090312]/90 border border-[#7A00B8]/30 p-2 sm:p-4 shadow-2xl">
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-2 pb-2.5 px-3 text-[11px] font-mono font-bold uppercase tracking-wider text-white/50 border-b border-white/10 items-center text-center">
-            <div className="col-span-1 text-left">RANK</div>
-            <div className="col-span-4 text-left">NAMA PESERTA</div>
-            <div className="col-span-1 text-[#f87171] leading-tight" title="Problem Structuring & Analytical Thinking (Max 30)">
-              PROBLEM (30)
-            </div>
-            <div className="col-span-1 text-[#f87171] leading-tight" title="Originality of Recommendation (Max 20)">
-              ORIGINAL (20)
-            </div>
-            <div className="col-span-1 text-[#f87171] leading-tight" title="Adaptability Under Pressure (Max 20)">
-              ADAPT (20)
-            </div>
-            <div className="col-span-1 text-[#f87171] leading-tight" title="Deck Quality & Communication (Max 15)">
-              DECK (15)
-            </div>
-            <div className="col-span-1 text-[#f87171] leading-tight" title="Executive Presence (Max 15)">
-              EXEC (15)
-            </div>
-            <div className="col-span-2 text-right pr-2 text-[#38bdf8]">TOTAL SKOR</div>
+        {/* 9 Participants Multi-Column Leaderboard Grid (Gauntlet Style) */}
+        <div className="flex-1 flex flex-col min-h-0 h-full rounded-2xl bg-black/40 border border-white/10 p-3 sm:p-4 overflow-hidden">
+          <div className="flex items-center justify-between px-1.5 pb-2.5 flex-shrink-0 border-b border-white/10 mb-3">
+            <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-purple-300 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse" />
+              Akumulasi Skor 9 Peserta Pressure Chamber
+            </span>
+            <span className="text-xs text-white/50 font-mono font-bold">
+              TOP 5 LOLOS KE EXECUTIVE PITCH
+            </span>
           </div>
 
-          {/* Table Rows (Matching Image 2 exact structure) */}
-          <div className="space-y-2 mt-2">
-            {chamberCandidates.map((p, idx) => {
+          {/* 3 Columns x 3 Rows = All 9 Participants perfectly framed */}
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 grid-rows-3 gap-3 min-h-0 overflow-hidden">
+            {rankedChamber.map((p, idx) => {
               const rank = idx + 1;
+              const isGold = rank === 1;
+              const isSilver = rank === 2;
+              const isBronze = rank === 3;
               const isTop5 = rank <= 5;
 
               return (
                 <div
                   key={p.id}
-                  className={`grid grid-cols-12 gap-2 items-center p-2.5 sm:p-3 rounded-xl border transition-all ${
-                    isTop5
-                      ? "bg-gradient-to-r from-[#0051C3]/20 via-[#7A00B8]/15 to-transparent border-[#7A00B8]/40 shadow-[0_0_15px_rgba(122,0,184,0.15)]"
-                      : "bg-white/[0.02] border-white/5 opacity-50"
+                  className={`px-3.5 py-2.5 rounded-2xl border flex items-center justify-between gap-3 transition-all overflow-hidden ${
+                    isGold
+                      ? "bg-gradient-to-r from-amber-500/25 via-yellow-500/10 to-transparent border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.25)]"
+                      : isSilver
+                      ? "bg-gradient-to-r from-slate-300/25 via-slate-400/10 to-transparent border-slate-300/60"
+                      : isBronze
+                      ? "bg-gradient-to-r from-amber-700/25 via-amber-800/10 to-transparent border-amber-600/60"
+                      : isTop5
+                      ? "bg-purple-950/30 border-purple-500/40"
+                      : "bg-white/[0.03] border-white/10 opacity-70"
                   }`}
                 >
-                  {/* Rank Column */}
-                  <div className="col-span-1 flex items-center">
-                    <span className="font-mono font-black text-base sm:text-xl text-white">
-                      {String(rank).padStart(2, "0")}
-                    </span>
-                  </div>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Rank Badge */}
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-xs sm:text-sm flex-shrink-0 ${
+                        isGold
+                          ? "bg-amber-400 text-black shadow-md"
+                          : isSilver
+                          ? "bg-slate-200 text-black shadow-md"
+                          : isBronze
+                          ? "bg-amber-600 text-white shadow-md"
+                          : isTop5
+                          ? "bg-purple-500/30 text-purple-300 border border-purple-500/40"
+                          : "bg-white/10 text-white/50 border border-white/15"
+                      }`}
+                    >
+                      {rank}
+                    </div>
 
-                  {/* Name + Avatar + University Column (Cyan/Teal block accent like Image 2) */}
-                  <div className="col-span-4 flex items-center gap-3 min-w-0">
-                    <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-[#00d2ff] flex-shrink-0 bg-neutral-900 shadow-[0_0_12px_rgba(0,210,255,0.4)]">
+                    {/* Avatar */}
+                    <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0 bg-neutral-900">
                       <Image
                         src={p.avatar || getParticipantPhoto(p.name)}
                         alt={p.name}
                         fill
-                        sizes="48px"
+                        sizes="40px"
                         style={{ objectPosition: getParticipantPhotoPosition(p.name) }}
                         className="object-cover"
                       />
                     </div>
-                    <div className="min-w-0">
-                      <h4 className="font-sans font-black text-sm sm:text-base text-white uppercase tracking-tight truncate">
+
+                    {/* Info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs sm:text-sm text-white truncate leading-tight">
                         {p.name}
-                      </h4>
-                      <p className="font-mono text-[10px] sm:text-[11px] text-[#00d2ff] uppercase truncate">
+                      </div>
+                      <div className="text-[10px] text-white/50 truncate font-mono">
                         {p.university}
-                      </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Criteria 1: Problem Structuring (30) */}
-                  <div className="col-span-1 text-center py-2 rounded-lg bg-red-950/40 border border-red-500/20 font-mono font-black text-sm sm:text-base text-white">
-                    {p.rubric.ps}
-                  </div>
-
-                  {/* Criteria 2: Originality (20) */}
-                  <div className="col-span-1 text-center py-2 rounded-lg bg-red-950/40 border border-red-500/20 font-mono font-black text-sm sm:text-base text-white">
-                    {p.rubric.orig}
-                  </div>
-
-                  {/* Criteria 3: Adaptability (20) */}
-                  <div className="col-span-1 text-center py-2 rounded-lg bg-red-950/40 border border-red-500/20 font-mono font-black text-sm sm:text-base text-white">
-                    {p.rubric.adapt}
-                  </div>
-
-                  {/* Criteria 4: Deck Quality (15) */}
-                  <div className="col-span-1 text-center py-2 rounded-lg bg-red-950/40 border border-red-500/20 font-mono font-black text-sm sm:text-base text-white">
-                    {p.rubric.deck}
-                  </div>
-
-                  {/* Criteria 5: Executive Presence (15) */}
-                  <div className="col-span-1 text-center py-2 rounded-lg bg-red-950/40 border border-red-500/20 font-mono font-black text-sm sm:text-base text-white">
-                    {p.rubric.exec}
-                  </div>
-
-                  {/* Total Skor Column (Deep Blue Solid Box like Image 2) */}
-                  <div className="col-span-2 text-right pr-2">
-                    <div className="inline-block px-4 py-2 rounded-lg bg-[#0051C3] border border-[#38bdf8]/40 shadow-[0_0_15px_rgba(0,81,195,0.4)]">
-                      <span className="font-mono font-black text-base sm:text-lg text-white">
-                        {p.calculatedScore.toLocaleString()}
-                      </span>
+                  {/* Score */}
+                  <div className="flex-shrink-0 text-right">
+                    <div className="font-mono font-black text-base sm:text-lg text-purple-300">
+                      {p.score.toLocaleString()}
+                    </div>
+                    <div className="text-[9px] uppercase font-bold text-white/40 tracking-wider">
+                      PTS
                     </div>
                   </div>
                 </div>
@@ -429,186 +391,146 @@ export function Round4PressureChamber({
     );
   }
 
-  // --------------------------------------------------------------------------
-  // LIVE SPIN WHEEL VIEW
-  // --------------------------------------------------------------------------
-  return (
-    <div className="w-full space-y-6">
-      {/* Header Banner */}
-      <div className="stage-panel p-6 sm:p-8 rounded-2xl border-white/10 bg-[#0d0418]/80">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-white/10">
-          <div>
+  // =========================================================================
+  // 2. TIMER VIEW (Giant Standalone Precision Countdown)
+  // =========================================================================
+  if (effectiveMode === "timer") {
+    return (
+      <div className="w-full h-full flex flex-col justify-between max-w-7xl mx-auto overflow-hidden animate-in fade-in duration-300">
+        {/* Header - Only Pressure Chamber */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-shrink-0">
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase font-sans">
+            PRESSURE CHAMBER
+          </h1>
+          {onSetViewMode && (
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-bold uppercase tracking-widest bg-[#7A00B8]/25 text-[#c084fc] border border-[#7A00B8]/50">
-                <Flame className="w-3.5 h-3.5 text-[#c084fc]" />
-                Round 05
-              </span>
-              <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-sm bg-white/5 text-white/70 border border-white/10">
-                {activeNames.length} Sisa di Roda • 5 Maju ke Final
-              </span>
+              <button
+                type="button"
+                onClick={() => onSetViewMode("wheel")}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Disc3 className="w-3.5 h-3.5 text-purple-300" />
+                <span>Roda Putar</span>
+              </button>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white mt-2.5 tracking-tight uppercase font-sans">
-              Pressure Chamber
-            </h1>
-            <p className="text-xs sm:text-sm text-white/50 mt-1 max-w-xl font-mono">
-              High-intensity interrogation round. Spin the wheel to pick candidates. Once spun, candidates leave the wheel.
-            </p>
-          </div>
+          )}
+        </div>
 
-          {/* Precision Timer Display */}
-          <div className="px-6 py-3 rounded-xl bg-black/40 border border-white/10 text-right min-w-[200px]">
-            <div className="text-[11px] uppercase font-mono font-bold tracking-wider text-white/50 flex items-center justify-end gap-1.5 mb-1">
-              <Clock className="w-3.5 h-3.5 text-[#c084fc]" />
-              Timer Countdown
-            </div>
+        {/* Big Giant Timer Box */}
+        <div className="glass-panel p-8 sm:p-14 rounded-3xl border-white/10 bg-gradient-to-b from-white/[0.03] via-[#080a09] to-black text-center relative overflow-hidden shadow-2xl my-auto">
+          <div
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-all duration-700 ${
+              isCriticalTime
+                ? "bg-red-600/20"
+                : isLowTime
+                ? "bg-amber-500/20"
+                : "bg-purple-600/20"
+            }`}
+          />
+
+          <div className="relative z-10 my-8 sm:my-12">
             <div
-              className={`font-mono text-3xl sm:text-4xl font-black tracking-wider ${
-                timeRemainingMs <= 10000 && timeRemainingMs > 0 ? "text-red-500 animate-pulse" : "text-white"
+              className={`font-mono text-6xl sm:text-8xl md:text-9xl font-black tracking-wider transition-colors duration-300 drop-shadow-[0_0_35px_rgba(0,0,0,0.8)] ${
+                isCriticalTime
+                  ? "text-red-500 animate-pulse drop-shadow-[0_0_40px_rgba(239,68,68,0.5)]"
+                  : isLowTime
+                  ? "text-amber-400 drop-shadow-[0_0_35px_rgba(251,191,36,0.4)]"
+                  : "text-white"
               }`}
             >
-              {formatTimerDisplay(timeRemainingMs)}
+              {formatPrecisionCountdown(timeRemainingMs)}
+            </div>
+            <div className="flex items-center justify-center gap-12 sm:gap-24 text-xs sm:text-sm text-white/40 uppercase font-mono tracking-widest mt-4">
+              <span>Minutes</span>
+              <span>Seconds</span>
+              <span>Hundredths</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // 3. SPIN WHEEL VIEW (Only Spin Wheel + CR Logo in Center)
+  // =========================================================================
+  return (
+    <div className="w-full h-full flex flex-col justify-between max-w-7xl mx-auto overflow-hidden animate-in fade-in duration-300 select-none">
+      {/* Header - Only Pressure Chamber */}
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-shrink-0">
+        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase font-sans">
+          PRESSURE CHAMBER
+        </h1>
+        {onSetViewMode && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onSetViewMode("timer")}
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <Clock className="w-3.5 h-3.5 text-purple-300" />
+              <span>Timer</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetViewMode("leaderboard")}
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <Trophy className="w-3.5 h-3.5 text-purple-300" />
+              <span>Leaderboard</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Wheel Display with CR Logo in Center */}
+      <div className="flex-1 flex flex-col items-center justify-center min-h-0 py-2">
+        <div className="relative flex items-center justify-center">
+          {/* Wheel Canvas */}
+          <div className="relative p-3 rounded-full bg-gradient-to-b from-[#7A00B8]/30 via-white/5 to-transparent border border-[#7A00B8]/40 shadow-[0_0_50px_rgba(122,0,184,0.3)]">
+            <canvas
+              ref={canvasRef}
+              width={460}
+              height={460}
+              className="w-full max-w-[340px] sm:max-w-[420px] md:max-w-[460px] aspect-square"
+            />
+            {/* Center CR Logo Overlay */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#0a0212] border-2 border-[#c084fc] shadow-[0_0_20px_rgba(192,132,252,0.5)] flex items-center justify-center overflow-hidden z-20 pointer-events-none">
+              <div className="relative w-10 h-10 sm:w-11 sm:h-11">
+                <Image
+                  src="/LogoCR.png"
+                  alt="CR Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Spin Wheel Arena */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          {/* Wheel Display Canvas */}
-          <div className="lg:col-span-6 flex flex-col items-center justify-center">
-            <div className="relative p-2 rounded-full bg-gradient-to-b from-[#7A00B8]/30 via-white/5 to-transparent border border-[#7A00B8]/40 shadow-[0_0_40px_rgba(122,0,184,0.25)]">
-              <canvas
-                ref={canvasRef}
-                width={420}
-                height={420}
-                className="w-full max-w-[340px] sm:max-w-[400px] aspect-square"
-              />
+        {/* Selected Winner Spotlight Card */}
+        {currentWinner && (
+          <div className="mt-4 px-6 py-3 rounded-2xl bg-gradient-to-r from-[#7A00B8]/40 via-purple-950/60 to-[#7A00B8]/40 border border-[#c084fc]/50 shadow-[0_0_30px_rgba(192,132,252,0.3)] text-center animate-in zoom-in-95">
+            <div className="text-[10px] uppercase font-mono font-bold tracking-widest text-[#c084fc] flex items-center justify-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5" /> Selected Contestant
             </div>
-
-            <div className="flex items-center gap-3 mt-6">
-              <button
-                onClick={spinWheel}
-                disabled={isSpinning || activeNames.length === 0}
-                className="px-8 py-3.5 rounded-xl bg-[#7A00B8] hover:bg-[#8f12d4] disabled:opacity-50 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-[0_0_25px_rgba(122,0,184,0.4)] hover:shadow-[0_0_35px_rgba(122,0,184,0.6)] transition-all transform hover:scale-105 cursor-pointer"
-              >
-                <Disc3 className={`w-4 h-4 ${isSpinning ? "animate-spin" : ""}`} />
-                {isSpinning ? "Spinning..." : `Spin The Wheel (${activeNames.length} Sisa)`}
-              </button>
-
-              {isAdmin && onToggleLeaderboard && (
-                <button
-                  type="button"
-                  onClick={onToggleLeaderboard}
-                  className="px-5 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs uppercase flex items-center gap-2 cursor-pointer transition-colors"
-                >
-                  <Trophy className="w-4 h-4 text-[#c084fc]" />
-                  <span>Leaderboard</span>
-                </button>
-              )}
+            <div className="text-xl sm:text-2xl font-black text-white font-sans mt-0.5">
+              {currentWinner}
             </div>
           </div>
+        )}
 
-          {/* Selected Contestant Spotlight & Scoreboard */}
-          <div className="lg:col-span-6 space-y-4">
-            {currentWinner ? (
-              <div className="stage-panel p-6 rounded-xl border-[#7A00B8]/60 bg-gradient-to-b from-[#7A00B8]/20 to-transparent shadow-[0_0_30px_rgba(122,0,184,0.25)] animate-in zoom-in-95">
-                <div className="text-xs uppercase font-mono font-bold tracking-widest text-[#c084fc] flex items-center gap-1.5 mb-2">
-                  <UserCheck className="w-4 h-4" /> Selected For Pressure Chamber
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-black text-white font-sans">{currentWinner}</h3>
-                <p className="text-xs font-mono text-white/60 mt-1">
-                  Candidate selected to enter the hot seat. Prepare for executive grilling!
-                </p>
-              </div>
-            ) : (
-              <div className="p-6 rounded-xl border border-dashed border-white/10 text-center bg-white/[0.01]">
-                <Disc3 className="w-8 h-8 text-white/30 mx-auto mb-2" />
-                <p className="text-xs sm:text-sm font-mono text-white/60">
-                  Ready to spin. Tap &quot;Spin The Wheel&quot; to pick the next contestant.
-                </p>
-              </div>
-            )}
-
-            {/* Chamber Candidates (Active on Wheel + Spun Winners) */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/10">
-              <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/10">
-                <span className="text-xs uppercase font-mono font-bold tracking-wider text-white/70">
-                  Chamber Contestants ({chamberCandidates.length} Active)
-                </span>
-                <span className="text-xs uppercase font-mono font-bold tracking-wider text-[#c084fc]">
-                  Score
-                </span>
-              </div>
-
-              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                {chamberCandidates.map((p, idx) => {
-                  const isCurrent = currentWinner === p.name;
-                  const isSpun = !activeNames.includes(p.name);
-
-                  return (
-                    <div
-                      key={p.id}
-                      className={`p-2.5 rounded-lg flex items-center justify-between text-xs transition-all ${
-                        isCurrent
-                          ? "bg-[#7A00B8]/30 border border-[#7A00B8]/60 font-bold"
-                          : isSpun
-                          ? "bg-white/[0.02] border border-white/5 opacity-50"
-                          : "bg-white/[0.04] border border-white/10 hover:bg-white/[0.08]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-5 h-5 rounded-full bg-white/10 text-white/60 flex items-center justify-center text-[10px] font-mono font-bold">
-                          {idx + 1}
-                        </span>
-                        <div className="relative w-6 h-6 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
-                          <Image
-                            src={p.avatar || getParticipantPhoto(p.name)}
-                            alt={p.name}
-                            fill
-                            sizes="24px"
-                            style={{ objectPosition: getParticipantPhotoPosition(p.name) }}
-                            className="object-cover"
-                          />
-                        </div>
-                        <span className="font-semibold text-white truncate max-w-[180px] sm:max-w-[220px]">
-                          {p.name}
-                        </span>
-                        {isSpun && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold uppercase">
-                            Sudah Tampil
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-[#c084fc]">
-                          {p.calculatedScore}
-                        </span>
-
-                        {isAdmin && onScoreChange && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => onScoreChange(p.id, 10)}
-                              title="+10 pts"
-                              className="p-1 rounded bg-[#7A00B8]/30 hover:bg-[#7A00B8]/50 text-[#c084fc]"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => onScoreChange(p.id, -10)}
-                              title="-10 pts"
-                              className="p-1 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300"
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+        {/* Spin Trigger Button */}
+        <div className="mt-4">
+          <button
+            onClick={spinWheel}
+            disabled={isSpinning || activeNames.length === 0}
+            className="px-8 py-3.5 rounded-2xl bg-[#7A00B8] hover:bg-[#8f12d4] disabled:opacity-50 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-[0_0_25px_rgba(122,0,184,0.4)] hover:shadow-[0_0_35px_rgba(122,0,184,0.6)] transition-all transform hover:scale-105 cursor-pointer"
+          >
+            <Disc3 className={`w-4 h-4 ${isSpinning ? "animate-spin" : ""}`} />
+            {isSpinning ? "Spinning..." : `Spin The Wheel (${activeNames.length} Sisa)`}
+          </button>
         </div>
       </div>
     </div>

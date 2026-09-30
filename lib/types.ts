@@ -24,6 +24,7 @@ export interface Participant {
   point_gauntlet?: number;
   point_rootmaster?: number;
   pressureRubric?: PressureRubric;
+  passedAt?: number;
 }
 
 export interface PlayerRecord {
@@ -38,6 +39,7 @@ export interface PlayerRecord {
   avatar?: string;
   round2_status?: string;
   eliminated_in_round?: number | null;
+  passed_at?: number;
 }
 
 export interface SubRoundConfig {
@@ -70,6 +72,8 @@ export type Round1Phase =
   | "preview"
   | "answering";
 
+export type StageViewMode = "wheel" | "timer" | "leaderboard";
+
 export interface GameState {
   currentRound: number; // 1 to 6
   // Round 1 state
@@ -83,12 +87,14 @@ export interface GameState {
   // Round 2 state (Capital Conquest)
   round2TargetAnswer: number;
   round2IsOpen: boolean;
+  round2ShowLeaderboard?: boolean;
 
   // Round 3 state (Rootmaster)
   round3TimeRemainingMs: number;
   round3TimerRunning: boolean;
   round3InitialMs: number;
   round3TimerEndAt?: number | null;
+  round3ShowLeaderboard?: boolean;
 
   // Round 4 state (Sacred Handoff)
   round4TimeRemainingMs: number;
@@ -96,6 +102,7 @@ export interface GameState {
   round4SpinNames?: string[];
   round4SelectedWinner?: string | null;
   round4TimerEndAt?: number | null;
+  round4ShowLeaderboard?: boolean;
 
   // Round 5 state (Pressure Chamber)
   round5SpinNames: string[];
@@ -105,6 +112,7 @@ export interface GameState {
   round5GameEnded?: boolean;
   round5TimerEndAt?: number | null;
   round5ShowLeaderboard?: boolean;
+  round5ViewMode?: StageViewMode;
   round5SpunWinners?: string[];
 
   // Round 6 state (Executive Pitch)
@@ -115,6 +123,7 @@ export interface GameState {
   round6GameEnded?: boolean;
   round6TimerEndAt?: number | null;
   round6ShowLeaderboard?: boolean;
+  round6ViewMode?: StageViewMode;
   round6SpunWinners?: string[];
 
   // Participants map or list

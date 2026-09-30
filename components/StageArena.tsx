@@ -9,7 +9,7 @@ import { Round4SacredHandoff } from "./Round4SacredHandoff.tsx";
 import { Round4PressureChamber } from "./Round4PressureChamber.tsx";
 import { Round5ExecutivePitch } from "./Round5ExecutivePitch.tsx";
 import { useGameState } from "../lib/useGameState.ts";
-import { getNextQuestionState, getPrevQuestionState } from "../lib/gameEngine.ts";
+import { getNextQuestionState, getPrevQuestionState, getActiveRoundParticipants } from "../lib/gameEngine.ts";
 import { Volume2, VolumeX, Maximize2, Minimize2, Shield, Radio, Copy, Check, LogOut } from "lucide-react";
 
 interface StageArenaProps {
@@ -195,7 +195,7 @@ export function StageArena({ roomCode }: StageArenaProps) {
 
   const handleNextQuestion = () => {
     const next = getNextQuestionState(gameState.subRoundIndex, gameState.questionIndex);
-    const duration = 30000;
+    const duration = 120000;
     updateState({
       subRoundIndex: next.subRoundIndex,
       questionIndex: next.questionIndex,
@@ -212,7 +212,7 @@ export function StageArena({ roomCode }: StageArenaProps) {
       subRoundIndex: prev.subRoundIndex,
       questionIndex: prev.questionIndex,
       round1Phase: "question_timer",
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: 120000,
       round1TimerRunning: false,
       round1TimerEndAt: null,
     });
@@ -328,7 +328,7 @@ export function StageArena({ roomCode }: StageArenaProps) {
             onPhaseChange={(newPhase) => {
               const isRunning =
                 newPhase === "question_timer" || newPhase === "question_options";
-              const duration = isRunning ? 30000 : 0;
+              const duration = isRunning ? 120000 : 0;
               updateState({
                 round1Phase: newPhase,
                 round1TimerRunning: isRunning,
@@ -349,6 +349,10 @@ export function StageArena({ roomCode }: StageArenaProps) {
               soundEnabled={gameState.soundEnabled}
               onParticipantPass={handleRound2Pass}
               showInputForm={false}
+              showLeaderboard={gameState.round2ShowLeaderboard || false}
+              onToggleLeaderboard={() =>
+                updateState({ round2ShowLeaderboard: !gameState.round2ShowLeaderboard })
+              }
             />
           </div>
         )}
@@ -356,9 +360,14 @@ export function StageArena({ roomCode }: StageArenaProps) {
         {gameState.currentRound === 3 && (
           <div className="w-full max-w-5xl mx-auto">
             <Round3Rootmaster
+              participants={gameState.participants}
               timeRemainingMs={gameState.round3TimeRemainingMs}
               timerRunning={gameState.round3TimerRunning}
               soundEnabled={gameState.soundEnabled}
+              showLeaderboard={gameState.round3ShowLeaderboard || false}
+              onToggleLeaderboard={() =>
+                updateState({ round3ShowLeaderboard: !gameState.round3ShowLeaderboard })
+              }
             />
           </div>
         )}
@@ -370,6 +379,10 @@ export function StageArena({ roomCode }: StageArenaProps) {
               timeRemainingMs={gameState.round4TimeRemainingMs || 300000}
               timerRunning={gameState.round4TimerRunning || false}
               soundEnabled={gameState.soundEnabled}
+              showLeaderboard={gameState.round4ShowLeaderboard || false}
+              onToggleLeaderboard={() =>
+                updateState({ round4ShowLeaderboard: !gameState.round4ShowLeaderboard })
+              }
             />
           </div>
         )}
@@ -380,7 +393,7 @@ export function StageArena({ roomCode }: StageArenaProps) {
               spinNames={
                 gameState.round5SpinNames !== undefined
                   ? gameState.round5SpinNames
-                  : gameState.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
+                  : getActiveRoundParticipants(gameState.participants, 5).slice(0, 9).map((p) => p.name)
               }
               participants={gameState.participants}
               timeRemainingMs={gameState.round5TimeRemainingMs ?? gameState.round4TimeRemainingMs ?? 0}
@@ -388,15 +401,25 @@ export function StageArena({ roomCode }: StageArenaProps) {
               selectedWinner={gameState.round5SelectedWinner ?? gameState.round4SelectedWinner ?? null}
               soundEnabled={gameState.soundEnabled}
               showLeaderboard={gameState.round5ShowLeaderboard || false}
+              viewMode={gameState.round5ViewMode || (gameState.round5ShowLeaderboard ? "leaderboard" : "wheel")}
               spunWinners={gameState.round5SpunWinners || []}
+              onSetViewMode={(mode) =>
+                updateState({
+                  round5ViewMode: mode,
+                  round5ShowLeaderboard: mode === "leaderboard",
+                })
+              }
               onToggleLeaderboard={() =>
-                updateState({ round5ShowLeaderboard: !gameState.round5ShowLeaderboard })
+                updateState({
+                  round5ShowLeaderboard: !gameState.round5ShowLeaderboard,
+                  round5ViewMode: !gameState.round5ShowLeaderboard ? "leaderboard" : "wheel",
+                })
               }
               onSpinEnd={(winner) => {
                 const currentSpin =
                   gameState.round5SpinNames !== undefined
                     ? gameState.round5SpinNames
-                    : gameState.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name);
+                    : getActiveRoundParticipants(gameState.participants, 5).slice(0, 9).map((p) => p.name);
                 const updatedSpin = currentSpin.filter((n) => n !== winner);
                 const currentSpun = gameState.round5SpunWinners || [];
                 const updatedSpun = currentSpun.includes(winner) ? currentSpun : [...currentSpun, winner];
@@ -419,7 +442,7 @@ export function StageArena({ roomCode }: StageArenaProps) {
               spinNames={
                 gameState.round6SpinNames !== undefined
                   ? gameState.round6SpinNames
-                  : gameState.participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6).slice(0, 5).map((p) => p.name)
+                  : getActiveRoundParticipants(gameState.participants, 6).slice(0, 5).map((p) => p.name)
               }
               participants={gameState.participants}
               timeRemainingMs={gameState.round6TimeRemainingMs ?? gameState.round5TimeRemainingMs ?? 0}
@@ -428,15 +451,25 @@ export function StageArena({ roomCode }: StageArenaProps) {
               selectedWinner={gameState.round6SelectedWinner ?? gameState.round5SelectedWinner ?? null}
               soundEnabled={gameState.soundEnabled}
               showLeaderboard={gameState.round6ShowLeaderboard || gameState.round6GameEnded || gameState.round5GameEnded || false}
+              viewMode={gameState.round6ViewMode || (gameState.round6ShowLeaderboard || gameState.round6GameEnded ? "leaderboard" : "wheel")}
               spunWinners={gameState.round6SpunWinners || []}
+              onSetViewMode={(mode) =>
+                updateState({
+                  round6ViewMode: mode,
+                  round6ShowLeaderboard: mode === "leaderboard",
+                })
+              }
               onToggleLeaderboard={() =>
-                updateState({ round6ShowLeaderboard: !gameState.round6ShowLeaderboard })
+                updateState({
+                  round6ShowLeaderboard: !gameState.round6ShowLeaderboard,
+                  round6ViewMode: !gameState.round6ShowLeaderboard ? "leaderboard" : "wheel",
+                })
               }
               onSpinEnd={(winner) => {
                 const currentSpin =
                   gameState.round6SpinNames !== undefined
                     ? gameState.round6SpinNames
-                    : gameState.participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6).slice(0, 5).map((p) => p.name);
+                    : getActiveRoundParticipants(gameState.participants, 6).slice(0, 5).map((p) => p.name);
                 const updatedSpin = currentSpin.filter((n) => n !== winner);
                 const currentSpun = gameState.round6SpunWinners || [];
                 const updatedSpun = currentSpun.includes(winner) ? currentSpun : [...currentSpun, winner];

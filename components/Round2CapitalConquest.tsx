@@ -5,9 +5,15 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import confetti from "canvas-confetti";
 import { Participant } from "../lib/types.ts";
-import { validateRound2Answer, getParticipantPhoto, getParticipantPhotoPosition, isGoldenTicket } from "../lib/gameEngine.ts";
+import {
+  validateRound2Answer,
+  getParticipantPhoto,
+  getParticipantPhotoPosition,
+  isGoldenTicket,
+  getActiveRoundParticipants,
+} from "../lib/gameEngine.ts";
 import { playSuccessFanfare } from "../lib/audio.ts";
-import { CheckCircle2, XCircle, Clock, Sparkles, Send, X, Award } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Sparkles, Send, X, Award, Trophy, LayoutGrid } from "lucide-react";
 
 interface Round2CapitalConquestProps {
   participants: Participant[];
@@ -17,6 +23,8 @@ interface Round2CapitalConquestProps {
   onParticipantFail?: (participantId: string) => void;
   isAdmin?: boolean;
   showInputForm?: boolean;
+  showLeaderboard?: boolean;
+  onToggleLeaderboard?: () => void;
 }
 
 export function Round2CapitalConquest({
@@ -27,9 +35,11 @@ export function Round2CapitalConquest({
   onParticipantFail,
   isAdmin = false,
   showInputForm = false,
+  showLeaderboard = false,
+  onToggleLeaderboard,
 }: Round2CapitalConquestProps) {
-  // Golden ticket participants do not play in Round 2
-  const round2Participants = participants.filter((p) => !isGoldenTicket(p));
+  // Only active contenders for Round 2 (excludes golden ticket & participants eliminated in Round 1)
+  const round2Participants = getActiveRoundParticipants(participants, 2);
   const [inputVal, setInputVal] = useState("");
   const params = useParams();
   const routeRoom = params?.roomCode
@@ -50,7 +60,7 @@ export function Round2CapitalConquest({
         particleCount: 120,
         spread: 80,
         origin: { y: 0.6 },
-        colors: ["#8cc63f", "#34d399", "#fbbf24", "#ffffff"],
+        colors: ["#38bdf8", "#0051C3", "#8cc63f", "#ffffff"],
       });
       setTimeout(() => {
         confetti({
@@ -90,7 +100,9 @@ export function Round2CapitalConquest({
         onParticipantPass(selectedParticipantId);
       }
     } else {
-      setSubmissionError("Incorrect value. Re-analyze financial metrics and try again.");
+      // Clear all inputs on incorrect answer
+      setSelectedParticipantId("");
+      setSubmissionError("Jawaban salah! Nilai valuasi tidak sesuai. Silakan hitung kembali dan coba lagi.");
     }
   };
 
@@ -115,6 +127,178 @@ export function Round2CapitalConquest({
   const passedCount = round2Participants.filter((p) => p.round2Status === "passed").length;
   const failedCount = round2Participants.filter((p) => p.round2Status === "failed").length;
 
+  // Ranked Capital Conquest Leaderboard:
+  // 1. Passed participants (sorted by submission timestamp / order passedAt)
+  // 2. Pending / active participants
+  // 3. Failed participants
+  const rankedR2 = [...round2Participants].sort((a, b) => {
+    if (a.round2Status === "passed" && b.round2Status === "passed") {
+      return (a.passedAt || 0) - (b.passedAt || 0);
+    }
+    if (a.round2Status === "passed") return -1;
+    if (b.round2Status === "passed") return 1;
+    if (a.round2Status === "pending" && b.round2Status === "failed") return -1;
+    if (a.round2Status === "failed" && b.round2Status === "pending") return 1;
+    return b.score - a.score;
+  });
+
+  const passedParticipants = rankedR2.filter((p) => p.round2Status === "passed");
+  const otherParticipants = rankedR2.filter((p) => p.round2Status !== "passed");
+
+  // =========================================================================
+  // LEADERBOARD VIEW (Gauntlet Design Style)
+  // =========================================================================
+  if (showLeaderboard) {
+    return (
+      <div className="w-full h-full flex flex-col justify-between max-w-7xl mx-auto overflow-hidden animate-in fade-in duration-300">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10 flex-shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-mono font-bold uppercase tracking-wider bg-[#0051C3]/20 text-[#38bdf8] border border-[#0051C3]/40">
+                <Trophy className="w-4 h-4" /> Klasemen Round 2: Capital Conquest
+              </span>
+              <span className="text-xs font-mono text-white/60 hidden sm:inline">
+                {round2Participants.length} Kontender
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase mt-1 font-sans">
+              Capital Conquest Leaderboard
+            </h2>
+          </div>
+
+          {/* Status Badges */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-bold">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{passedCount} Lolos</span>
+            </div>
+            {failedCount > 0 && (
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-mono font-bold">
+                <XCircle className="w-4 h-4" />
+                <span>{failedCount} Gugur</span>
+              </div>
+            )}
+            {onToggleLeaderboard && (
+              <button
+                type="button"
+                onClick={onToggleLeaderboard}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Arena Grid</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 18 Participants Grid (Gauntlet 3x6 style, clearly visible on stage) */}
+        <div className="flex-1 flex flex-col min-h-0 h-full rounded-2xl bg-black/40 border border-white/10 p-2.5 sm:p-3 overflow-hidden">
+          <div className="flex items-center justify-between px-1.5 pb-2 flex-shrink-0 border-b border-white/10 mb-2">
+            <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-[#38bdf8] flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] animate-pulse" />
+              Daftar Peserta & Kualifikasi Lolos (Urutan Submit Valuasi)
+            </span>
+            <span className="text-xs text-white/50 font-mono font-bold">
+              {passedCount} / {round2Participants.length} LOLOS
+            </span>
+          </div>
+
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 grid-rows-6 gap-2 min-h-0 overflow-hidden">
+            {rankedR2.map((p, idx) => {
+              const isPassed = p.round2Status === "passed";
+              const isFailed = p.round2Status === "failed";
+              const rank = idx + 1;
+              const isGold = rank === 1 && isPassed;
+              const isSilver = rank === 2 && isPassed;
+              const isBronze = rank === 3 && isPassed;
+
+              return (
+                <div
+                  key={p.id}
+                  className={`px-3 py-2 rounded-xl border flex items-center justify-between gap-2.5 transition-all overflow-hidden ${
+                    isGold
+                      ? "bg-gradient-to-r from-amber-500/25 via-yellow-500/10 to-transparent border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.25)]"
+                      : isSilver
+                      ? "bg-gradient-to-r from-slate-300/25 via-slate-400/10 to-transparent border-slate-300/60"
+                      : isBronze
+                      ? "bg-gradient-to-r from-amber-700/25 via-amber-800/10 to-transparent border-amber-600/60"
+                      : isPassed
+                      ? "bg-emerald-950/30 border-emerald-500/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                      : isFailed
+                      ? "bg-red-950/20 border-red-500/30 opacity-60"
+                      : "bg-white/[0.04] border-white/10 opacity-75"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    {/* Rank Badge */}
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-mono font-black text-xs sm:text-sm flex-shrink-0 ${
+                        isGold
+                          ? "bg-amber-400 text-black shadow-md"
+                          : isSilver
+                          ? "bg-slate-200 text-black shadow-md"
+                          : isBronze
+                          ? "bg-amber-600 text-white shadow-md"
+                          : isPassed
+                          ? "bg-emerald-500 text-black font-black"
+                          : "bg-white/10 text-white/60 border border-white/15"
+                      }`}
+                    >
+                      {rank}
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-white/20 flex-shrink-0 bg-neutral-900">
+                      <Image
+                        src={p.avatar || getParticipantPhoto(p.name)}
+                        alt={p.name}
+                        fill
+                        sizes="36px"
+                        style={{ objectPosition: getParticipantPhotoPosition(p.name) }}
+                        className="object-cover"
+                      />
+                    </div>
+
+                    {/* Name and University */}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs sm:text-sm text-white truncate leading-tight">
+                        {p.name}
+                      </div>
+                      <div className="text-[10px] text-white/50 truncate font-mono">
+                        {p.university}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className="flex-shrink-0 text-right">
+                    {isPassed ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]">
+                        <CheckCircle2 className="w-3 h-3" /> Lolos
+                      </span>
+                    ) : isFailed ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-500 text-white">
+                        <XCircle className="w-3 h-3" /> Gugur
+                      </span>
+                    ) : (
+                      <span className="text-[10px] uppercase font-bold text-white/40 px-2 py-0.5 rounded bg-white/5">
+                        Menunggu
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // ARENA GRID VIEW
+  // =========================================================================
   return (
     <div className="w-full space-y-6">
       {/* Round 2 Header Card */}
@@ -164,15 +348,27 @@ export function Round2CapitalConquest({
               <strong className="text-[#38bdf8] px-2 py-0.5 rounded bg-black/40 border border-[#0051C3]/40">{inputHref}</strong>
             </div>
           </div>
-          <a
-            href={inputHref}
-            target="_blank"
-            rel="noreferrer"
-            className="px-4 py-2 rounded-lg bg-[#0051C3] hover:bg-[#0060e6] text-white font-mono font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm"
-          >
-            <span>Open Portal</span>
-            <Send className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex items-center gap-2">
+            {onToggleLeaderboard && (
+              <button
+                type="button"
+                onClick={onToggleLeaderboard}
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-mono font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <Trophy className="w-3.5 h-3.5 text-[#38bdf8]" />
+                <span>Leaderboard</span>
+              </button>
+            )}
+            <a
+              href={inputHref}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2 rounded-lg bg-[#0051C3] hover:bg-[#0060e6] text-white font-mono font-bold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+            >
+              <span>Open Portal</span>
+              <Send className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
 
         {/* Participant Input Console (Only shown if showInputForm is true) */}
@@ -283,7 +479,7 @@ export function Round2CapitalConquest({
                   )}
                 </div>
 
-                {/* Avatar with Khal fallback */}
+                {/* Avatar */}
                 <div
                   className={`relative w-14 h-14 rounded-full overflow-hidden mb-2 transition-all ${
                     isPassed

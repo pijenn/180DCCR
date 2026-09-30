@@ -221,7 +221,7 @@ export function Round1Gauntlet({
     onSelectAnswer?.(key);
   };
 
-  const progressPercent = Math.min(100, Math.max(0, (timeRemainingMs / 30000) * 100));
+  const progressPercent = Math.min(100, Math.max(0, (timeRemainingMs / 120000) * 100));
 
   // In Round 1 (The Gauntlet), only non-golden-ticket regular participants compete
   const gauntletContenders = participants.filter((p) => !isGoldenTicket(p));

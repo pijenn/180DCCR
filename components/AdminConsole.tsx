@@ -7,6 +7,7 @@ import {
   ROUND_1_SUBROUNDS,
   searchParticipants,
   applyScoreChange,
+  setManualScore,
   updateRound2Status,
   getNextQuestionState,
   getPrevQuestionState,
@@ -19,10 +20,14 @@ import {
   isGoldenTicket,
   GOLDEN_TICKET_NAMES,
   getParticipantPhoto,
+  getActiveRoundParticipants,
+  isParticipantActiveInRound,
+  isParticipantEliminated,
 } from "../lib/gameEngine.ts";
 import {
   Search,
   Plus,
+  Minus,
   XCircle,
   Play,
   Pause,
@@ -49,6 +54,7 @@ import {
   Database,
   Copy,
   Check,
+  LayoutGrid,
 } from "lucide-react";
 import {
   saveRoomStateToSupabase,
@@ -72,8 +78,11 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
+  // Manual Score Inputs Map for each participant
+  const [manualPointsMap, setManualPointsMap] = useState<Record<string, string>>({});
+
   // Custom Timer Duration Inputs
-  const [customTimerR1, setCustomTimerR1] = useState("30");
+  const [customTimerR1, setCustomTimerR1] = useState("120");
   const [customTimerR3Min, setCustomTimerR3Min] = useState("5");
   const [customTimerR3Sec, setCustomTimerR3Sec] = useState("0");
   const [customTimerR4Min, setCustomTimerR4Min] = useState("5");
@@ -81,6 +90,11 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
   const [customTimerR5Sec, setCustomTimerR5Sec] = useState("60");
   const [customTimerR6Min, setCustomTimerR6Min] = useState("3");
   const [customTimerR6Sec, setCustomTimerR6Sec] = useState("0");
+
+  const handleDirectScoreSet = (participantId: string, scoreVal: number) => {
+    const updated = setManualScore(state.participants, participantId, scoreVal, state.currentRound);
+    onUpdateState({ participants: updated });
+  };
 
   const handleSetRound1Timer = (seconds: number) => {
     const ms = Math.max(1000, seconds * 1000);
@@ -260,13 +274,10 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
 
   const filteredParticipants = searchedParticipants.filter((p) => {
     const isGT = isGoldenTicket(p);
-    const isEliminated = p.eliminatedInRound !== undefined && p.eliminatedInRound !== null;
+    const isEliminated = isParticipantEliminated(p);
 
     if (filterTab === "active") {
-      if (state.currentRound <= 3) {
-        return !isGT && !isEliminated;
-      }
-      return !isEliminated;
+      return isParticipantActiveInRound(p, state.currentRound);
     }
     if (filterTab === "eliminated") {
       return isEliminated;
@@ -315,7 +326,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
       subRoundIndex: subRoundIdx,
       questionIndex: 0,
       round1Phase: "question_timer",
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: 120000,
       round1TimerRunning: false,
       round1TimerEndAt: null,
     });
@@ -323,7 +334,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
 
   // Step 1: Question & Timer
   const handleStepQuestionTimer = () => {
-    const duration = 30000;
+    const duration = 120000;
     onUpdateState({
       round1Phase: "question_timer",
       round1TimeRemainingMs: duration,
@@ -334,7 +345,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
 
   // Step 2: Question, Timer, Options
   const handleStepQuestionOptions = () => {
-    const duration = 30000;
+    const duration = 120000;
     onUpdateState({
       round1Phase: "question_options",
       round1TimeRemainingMs: duration,
@@ -365,7 +376,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
   // Step 5: Next Soal
   const handleNextQuestion = () => {
     const next = getNextQuestionState(state.subRoundIndex, state.questionIndex);
-    const duration = 30000;
+    const duration = 120000;
     onUpdateState({
       subRoundIndex: next.subRoundIndex,
       questionIndex: next.questionIndex,
@@ -383,7 +394,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
       subRoundIndex: prev.subRoundIndex,
       questionIndex: prev.questionIndex,
       round1Phase: "question_timer",
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: 120000,
       round1TimerRunning: false,
       round1TimerEndAt: null,
     });
@@ -426,7 +437,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
   // Pause / Resume Round 1 Timer
   const handleToggleRound1Timer = () => {
     const willRun = !state.round1TimerRunning;
-    const remaining = state.round1TimeRemainingMs > 0 ? state.round1TimeRemainingMs : 30000;
+    const remaining = state.round1TimeRemainingMs > 0 ? state.round1TimeRemainingMs : 120000;
     onUpdateState({
       round1TimerRunning: willRun,
       round1TimeRemainingMs: remaining,
@@ -436,8 +447,9 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
 
   // Reset Round 1 Timer
   const handleResetRound1Timer = () => {
+    const sec = parseInt(customTimerR1, 10) || 120;
     onUpdateState({
-      round1TimeRemainingMs: 30000,
+      round1TimeRemainingMs: sec * 1000,
       round1TimerRunning: false,
       round1TimerEndAt: null,
       round1Phase: "question_timer",
@@ -457,15 +469,25 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
         subRoundIndex: 0,
         questionIndex: 0,
         round1Phase: "idle",
-        round1TimeRemainingMs: 30000,
+        round1TimeRemainingMs: 120000,
         round1TimerRunning: false,
+        round2ShowLeaderboard: false,
         round3TimeRemainingMs: 300000,
         round3TimerRunning: false,
-        round4TimeRemainingMs: 60000,
+        round3ShowLeaderboard: false,
+        round4TimeRemainingMs: 300000,
         round4TimerRunning: false,
-        round5TimeRemainingMs: 180000,
+        round4ShowLeaderboard: false,
+        round5TimeRemainingMs: 60000,
         round5TimerRunning: false,
         round5GameEnded: false,
+        round5ShowLeaderboard: false,
+        round5ViewMode: "wheel",
+        round6TimeRemainingMs: 180000,
+        round6TimerRunning: false,
+        round6GameEnded: false,
+        round6ShowLeaderboard: false,
+        round6ViewMode: "wheel",
         participants: resetParticipants,
       });
     }
@@ -937,16 +959,37 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-white/50 font-semibold">Target Answer:</label>
-              <input
-                type="number"
-                value={state.round2TargetAnswer}
-                onChange={(e) =>
-                  onUpdateState({ round2TargetAnswer: parseInt(e.target.value, 10) || 1467 })
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateState({ round2ShowLeaderboard: !state.round2ShowLeaderboard })
                 }
-                className="w-24 bg-neutral-900 border border-white/20 rounded-lg px-2.5 py-1 text-sm text-[#8cc63f] font-bold text-center"
-              />
+                className={`px-4 py-2 rounded-xl font-bold text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+                  state.round2ShowLeaderboard
+                    ? "bg-[#0051C3] text-white border border-[#38bdf8] shadow-[0_0_15px_rgba(0,81,195,0.4)]"
+                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5 text-[#38bdf8]" />
+                <span>
+                  {state.round2ShowLeaderboard
+                    ? "Layar Stage: LEADERBOARD AKTIF"
+                    : "Tampilkan Leaderboard di Stage"}
+                </span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-white/50 font-semibold">Target Answer:</label>
+                <input
+                  type="number"
+                  value={state.round2TargetAnswer}
+                  onChange={(e) =>
+                    onUpdateState({ round2TargetAnswer: parseInt(e.target.value, 10) || 1467 })
+                  }
+                  className="w-24 bg-neutral-900 border border-white/20 rounded-lg px-2.5 py-1 text-sm text-[#8cc63f] font-bold text-center"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -959,17 +1002,36 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
             <div>
               <h2 className="text-lg font-black text-white uppercase flex items-center gap-2">
                 <Clock className="w-5 h-5 text-amber-400" />
-                Round 3: Rootmaster Stage Timer & Score Settings
+                Round 3: Rootmaster Stage Timer & Scoring
               </h2>
               <p className="text-xs text-white/50">
-                Atur durasi waktu countdown Rootmaster. Skor scoring: <strong className="text-emerald-400 font-bold">+20 pts</strong> jika benar, <strong className="text-red-400 font-bold">-5 pts</strong> jika salah.
+                Atur countdown Rootmaster dan toggle klasemen stage. Penilaian skor menggunakan input manual.
               </p>
             </div>
 
-            {/* Custom Timer Input & Timer Controls */}
+            {/* Stage Leaderboard Toggle & Custom Timer Controls */}
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateState({ round3ShowLeaderboard: !state.round3ShowLeaderboard })
+                }
+                className={`px-4 py-2 rounded-xl font-bold text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+                  state.round3ShowLeaderboard
+                    ? "bg-amber-500 text-black border border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
+                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-300" />
+                <span>
+                  {state.round3ShowLeaderboard
+                    ? "Layar Stage: LEADERBOARD AKTIF"
+                    : "Tampilkan Leaderboard di Stage"}
+                </span>
+              </button>
+
               <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
-                <span className="text-[10px] text-white/50 uppercase font-bold">Durasi Timer:</span>
+                <span className="text-[10px] text-white/50 uppercase font-bold">Timer:</span>
                 <input
                   type="number"
                   min="0"
@@ -1061,15 +1123,34 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 <span className="text-xs text-white/50">12 Kontender → 9 Lolos</span>
               </div>
               <h2 className="text-lg font-black text-white uppercase mt-1">
-                Golden Ticket Official Entrance & Elimination (12 → 9)
+                Sacred Handoff Stage & Scoring (12 → 9)
               </h2>
               <p className="text-xs text-white/60">
-                3 Peserta Golden Ticket resmi aktif dan bersaing bersama 9 kontender dari Rootmaster.
+                3 Peserta Golden Ticket resmi aktif. Penilaian skor manual dan eliminasi berdasarkan peringkat atau seleksi manual.
               </p>
             </div>
 
-            {/* Custom Timer Input & Timer Controls */}
+            {/* Stage Leaderboard Toggle & Timer Controls */}
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateState({ round4ShowLeaderboard: !state.round4ShowLeaderboard })
+                }
+                className={`px-4 py-2 rounded-xl font-bold text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+                  state.round4ShowLeaderboard
+                    ? "bg-red-600 text-white border border-red-300 shadow-[0_0_15px_rgba(220,38,38,0.4)]"
+                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5 text-red-300" />
+                <span>
+                  {state.round4ShowLeaderboard
+                    ? "Layar Stage: LEADERBOARD AKTIF"
+                    : "Tampilkan Leaderboard di Stage"}
+                </span>
+              </button>
+
               <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
                 <span className="text-[10px] text-white/50 uppercase font-bold">Durasi Timer:</span>
                 <input
@@ -1152,28 +1233,79 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
 
       {/* Round 5 Admin Controls (Pressure Chamber: 9 -> 5) */}
       {state.currentRound === 5 && (
-        <div className="glass-panel p-6 rounded-3xl border-purple-500/30 space-y-6">
-          {/* Top Bar with Timer, Wheel Reset, & Stage Leaderboard Toggle */}
+        <div className="glass-panel p-6 rounded-3xl border-purple-500/30 space-y-5">
+          {/* Top Bar with Mode Switcher & Timer */}
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   <Disc3 className="w-3.5 h-3.5" />
-                  Round 5: Pressure Chamber Flow & Rubric Scoring
+                  Round 5: Pressure Chamber Controller
                 </span>
                 <span className="text-xs text-white/50">9 Kontender → 5 Finalis</span>
               </div>
               <h2 className="text-lg font-black text-white uppercase mt-1">
-                Pressure Chamber Controller & Rubric Scoring
+                Pressure Chamber Stage View & Timer
               </h2>
               <p className="text-xs text-white/50">
-                Pemain yang sudah terpilih di roda akan otomatis hilang. Leaderboard di stage hanya akan tampil ketika Anda memencet tombol toggle di bawah.
+                Pilih tampilan layar stage (Roda Putar, Timer, atau Leaderboard 9 Peserta) dan atur countdown.
               </p>
             </div>
 
-            {/* Timer & Stage View Toggle Buttons */}
+            {/* Mode Switcher Buttons */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Custom Timer Input */}
+              <div className="flex items-center gap-1 p-1 bg-black/60 border border-white/15 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateState({ round5ViewMode: "wheel", round5ShowLeaderboard: false })
+                  }
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                    (state.round5ViewMode === "wheel" || !state.round5ViewMode) && !state.round5ShowLeaderboard
+                      ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] font-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  <Disc3 className="w-3.5 h-3.5" />
+                  <span>Roda Putar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateState({ round5ViewMode: "timer", round5ShowLeaderboard: false })
+                  }
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                    state.round5ViewMode === "timer" && !state.round5ShowLeaderboard
+                      ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] font-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Timer Stage</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateState({ round5ViewMode: "leaderboard", round5ShowLeaderboard: true })
+                  }
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                    state.round5ShowLeaderboard || state.round5ViewMode === "leaderboard"
+                      ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] font-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Leaderboard (9 Peserta)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Timer Controls Row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-xl">
                 <Clock className="w-3.5 h-3.5 text-purple-400" />
                 <span className="text-[10px] text-white/50 uppercase font-bold">Timer:</span>
@@ -1225,7 +1357,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 className="px-3.5 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1 cursor-pointer"
               >
                 {state.round5TimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-black" />}
-                {state.round5TimerRunning ? "Pause" : "Mulai"}
+                {state.round5TimerRunning ? "Pause Timer" : "Mulai Timer"}
               </button>
 
               <button
@@ -1236,26 +1368,6 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Reset
-              </button>
-
-              {/* Stage Leaderboard Toggle Button */}
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdateState({ round5ShowLeaderboard: !state.round5ShowLeaderboard })
-                }
-                className={`px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-lg cursor-pointer ${
-                  state.round5ShowLeaderboard
-                    ? "bg-purple-600 text-white border-2 border-purple-300 shadow-[0_0_20px_rgba(168,85,247,0.5)] animate-pulse"
-                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
-                }`}
-              >
-                <Award className="w-4 h-4" />
-                <span>
-                  {state.round5ShowLeaderboard
-                    ? "Layar Stage: LEADERBOARD AKTIF (TAMPIL)"
-                    : "Tampilkan Leaderboard di Stage"}
-                </span>
               </button>
             </div>
           </div>
@@ -1269,7 +1381,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                   {(
                     (state.round5SpinNames && state.round5SpinNames.length > 0)
                       ? state.round5SpinNames
-                      : state.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
+                      : getActiveRoundParticipants(state.participants, 5).slice(0, 9).map((p) => p.name)
                   ).length}
                 </strong>{" "}
                 nama di wheel):
@@ -1279,13 +1391,9 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 <button
                   type="button"
                   onClick={() => {
-                    const activeNonGT = state.participants.filter(
-                      (p) => !p.isGoldenTicket && p.status !== "eliminated"
-                    );
-                    const top9 = (activeNonGT.length >= 9
-                      ? activeNonGT.slice(0, 9).map((p) => p.name)
-                      : state.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
-                    ).slice(0, 9);
+                    const top9 = getActiveRoundParticipants(state.participants, 5)
+                      .slice(0, 9)
+                      .map((p) => p.name);
                     onUpdateState({
                       round5SpinNames: top9,
                       round4SpinNames: top9,
@@ -1302,7 +1410,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {((state.round5SpinNames && state.round5SpinNames.length > 0)
                 ? state.round5SpinNames
-                : state.participants.filter((p) => !p.isGoldenTicket).slice(0, 9).map((p) => p.name)
+                : getActiveRoundParticipants(state.participants, 5).slice(0, 9).map((p) => p.name)
               ).map((name, idx) => (
                 <div
                   key={idx}
@@ -1316,183 +1424,12 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
               ))}
             </div>
           </div>
-
-          {/* Dedicated Pressure Chamber Rubric Scoring Table (Image 1 Rubric Criteria) */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                  <Award className="w-4 h-4 text-purple-400" />
-                  Tabel Penilaian Rubrik Pressure Chamber (Sesuai Format Juri)
-                </h3>
-                <p className="text-[11px] text-white/50">
-                  Input nilai per kriteria. Skor akhir (Final Score) otomatis terhitung dan langsung disinkronkan ke leaderboard live stage.
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-2xl border border-purple-500/30 bg-[#090312]/70">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-purple-950/50 border-b border-purple-500/30 text-white/70 uppercase font-mono font-bold text-[11px]">
-                    <th className="py-2.5 px-3">No.</th>
-                    <th className="py-2.5 px-3">Nama Peserta</th>
-                    <th className="py-2.5 px-3 text-center text-[#f87171]">
-                      Problem Structuring (30)
-                    </th>
-                    <th className="py-2.5 px-3 text-center text-[#f87171]">
-                      Originality (20)
-                    </th>
-                    <th className="py-2.5 px-3 text-center text-[#f87171]">
-                      Adaptability (20)
-                    </th>
-                    <th className="py-2.5 px-3 text-center text-[#f87171]">
-                      Deck Quality (15)
-                    </th>
-                    <th className="py-2.5 px-3 text-center text-[#f87171]">
-                      Exec Presence (15)
-                    </th>
-                    <th className="py-2.5 px-3 text-center text-[#38bdf8] font-black bg-purple-900/30">
-                      Final Score (100)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {state.participants
-                    .filter((p) => !p.isGoldenTicket && (p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 5))
-                    .slice(0, 9)
-                    .map((p, idx) => {
-                      const rubric = p.pressureRubric || {
-                        problemStructuring: 0,
-                        originality: 0,
-                        adaptability: 0,
-                        deckQuality: 0,
-                        executivePresence: 0,
-                      };
-                      const totalScore =
-                        (rubric.problemStructuring ?? 0) +
-                        (rubric.originality ?? 0) +
-                        (rubric.adaptability ?? 0) +
-                        (rubric.deckQuality ?? 0) +
-                        (rubric.executivePresence ?? 0);
-
-                      return (
-                        <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="py-2.5 px-3 font-mono text-white/40">{idx + 1}</td>
-                          <td className="py-2.5 px-3">
-                            <div className="font-bold text-white text-xs">{p.name}</div>
-                            <div className="text-[10px] text-white/40 truncate">{p.university}</div>
-                          </td>
-
-                          {/* Problem Structuring (Max 30) */}
-                          <td className="py-2.5 px-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="30"
-                              value={rubric.problemStructuring ?? 0}
-                              onChange={(e) =>
-                                handleRubricScoreChange(
-                                  p.id,
-                                  "problemStructuring",
-                                  parseInt(e.target.value, 10) || 0
-                                )
-                              }
-                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
-                            />
-                          </td>
-
-                          {/* Originality (Max 20) */}
-                          <td className="py-2.5 px-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="20"
-                              value={rubric.originality ?? 0}
-                              onChange={(e) =>
-                                handleRubricScoreChange(
-                                  p.id,
-                                  "originality",
-                                  parseInt(e.target.value, 10) || 0
-                                )
-                              }
-                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
-                            />
-                          </td>
-
-                          {/* Adaptability (Max 20) */}
-                          <td className="py-2.5 px-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="20"
-                              value={rubric.adaptability ?? 0}
-                              onChange={(e) =>
-                                handleRubricScoreChange(
-                                  p.id,
-                                  "adaptability",
-                                  parseInt(e.target.value, 10) || 0
-                                )
-                              }
-                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
-                            />
-                          </td>
-
-                          {/* Deck Quality (Max 15) */}
-                          <td className="py-2.5 px-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="15"
-                              value={rubric.deckQuality ?? 0}
-                              onChange={(e) =>
-                                handleRubricScoreChange(
-                                  p.id,
-                                  "deckQuality",
-                                  parseInt(e.target.value, 10) || 0
-                                )
-                              }
-                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
-                            />
-                          </td>
-
-                          {/* Executive Presence (Max 15) */}
-                          <td className="py-2.5 px-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="15"
-                              value={rubric.executivePresence ?? 0}
-                              onChange={(e) =>
-                                handleRubricScoreChange(
-                                  p.id,
-                                  "executivePresence",
-                                  parseInt(e.target.value, 10) || 0
-                                )
-                              }
-                              className="w-14 bg-neutral-900 border border-red-500/30 rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center focus:border-red-400 focus:outline-none"
-                            />
-                          </td>
-
-                          {/* Total Final Score */}
-                          <td className="py-2.5 px-3 text-center bg-purple-900/20">
-                            <span className="font-mono font-black text-sm text-[#00d2ff]">
-                              {totalScore}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       )}
 
       {/* Round 6 Admin Controls (Executive Pitch: 5 Finalists) */}
       {state.currentRound === 6 && (
-        <div className="glass-panel p-6 rounded-3xl border-amber-500/30 space-y-4">
+        <div className="glass-panel p-6 rounded-3xl border-amber-500/30 space-y-5">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
@@ -1506,12 +1443,64 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 Executive Pitch Final Controls & Winners
               </h2>
               <p className="text-xs text-white/50">
-                Putar roda untuk 5 finalis. Nama yang sudah tampil otomatis hilang dari roda. Leaderboard/Final Standings dapat di-toggle untuk broadcast stage.
+                Pilih tampilan layar stage (Roda Putar, Timer, atau Final Standings) dan kelola finalis.
               </p>
             </div>
 
-            {/* Custom Timer & Game End Buttons */}
+            {/* Mode Switcher Buttons */}
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 p-1 bg-black/60 border border-white/15 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateState({ round6ViewMode: "wheel", round6ShowLeaderboard: false })
+                  }
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                    (state.round6ViewMode === "wheel" || !state.round6ViewMode) && !state.round6ShowLeaderboard
+                      ? "bg-amber-500 text-black shadow-[0_0_15px_rgba(251,191,36,0.5)] font-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  <Disc3 className="w-3.5 h-3.5" />
+                  <span>Roda Putar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateState({ round6ViewMode: "timer", round6ShowLeaderboard: false })
+                  }
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                    state.round6ViewMode === "timer" && !state.round6ShowLeaderboard
+                      ? "bg-amber-500 text-black shadow-[0_0_15px_rgba(251,191,36,0.5)] font-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Timer Stage</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateState({ round6ViewMode: "leaderboard", round6ShowLeaderboard: true })
+                  }
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                    state.round6ShowLeaderboard || state.round6ViewMode === "leaderboard"
+                      ? "bg-amber-500 text-black shadow-[0_0_15px_rgba(251,191,36,0.5)] font-black"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Final Standings</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Timer & Game End Buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
                 <span className="text-[10px] text-white/50 uppercase font-bold">Timer Pitch:</span>
                 <input
@@ -1593,32 +1582,13 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 <RotateCcw className="w-3.5 h-3.5" /> Reset
               </button>
 
-              {/* Stage Leaderboard Toggle Button */}
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdateState({ round6ShowLeaderboard: !state.round6ShowLeaderboard })
-                }
-                className={`px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-1.5 transition-all shadow-lg cursor-pointer ${
-                  state.round6ShowLeaderboard
-                    ? "bg-amber-500 text-black border-2 border-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.5)] animate-pulse"
-                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
-                }`}
-              >
-                <Trophy className="w-4 h-4" />
-                <span>
-                  {state.round6ShowLeaderboard
-                    ? "Layar Stage: FINAL STANDINGS AKTIF"
-                    : "Tampilkan Final Standings di Stage"}
-                </span>
-              </button>
-
               <button
                 onClick={() =>
                   onUpdateState({
                     round6GameEnded: !state.round6GameEnded,
                     round5GameEnded: !state.round5GameEnded,
                     round6ShowLeaderboard: true,
+                    round6ViewMode: "leaderboard",
                   })
                 }
                 className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_20px_rgba(251,191,36,0.5)] cursor-pointer"
@@ -1637,7 +1607,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                   {(
                     (state.round6SpinNames && state.round6SpinNames.length > 0)
                       ? state.round6SpinNames
-                      : state.participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6).slice(0, 5).map((p) => p.name)
+                      : getActiveRoundParticipants(state.participants, 6).slice(0, 5).map((p) => p.name)
                   ).length}
                 </strong>{" "}
                 nama di wheel):
@@ -1646,8 +1616,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
               <button
                 type="button"
                 onClick={() => {
-                  const top5 = state.participants
-                    .filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6)
+                  const top5 = getActiveRoundParticipants(state.participants, 6)
                     .slice(0, 5)
                     .map((p) => p.name);
                   onUpdateState({
@@ -1664,7 +1633,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
               {((state.round6SpinNames && state.round6SpinNames.length > 0)
                 ? state.round6SpinNames
-                : state.participants.filter((p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null || p.eliminatedInRound >= 6).slice(0, 5).map((p) => p.name)
+                : getActiveRoundParticipants(state.participants, 6).slice(0, 5).map((p) => p.name)
               ).map((name, idx) => (
                 <div key={idx} className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/20 text-xs font-semibold text-white/90 flex items-center gap-2 truncate">
                   <span className="w-5 h-5 rounded-md bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
@@ -1950,13 +1919,8 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                           />
                         </div>
                         <div>
-                          <div className="font-bold text-white text-sm group-hover:text-[#8cc63f] transition-colors flex items-center gap-1.5">
-                            <span>{p.name}</span>
-                            {isGT && (
-                              <span title="Golden Ticket Holder" className="text-amber-400 text-xs">
-                                🎫
-                              </span>
-                            )}
+                          <div className="font-bold text-white text-sm group-hover:text-[#8cc63f] transition-colors">
+                            {p.name}
                           </div>
                           <div className="text-xs text-white/40">{p.university}</div>
                         </div>
@@ -2012,7 +1976,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                     <td className="py-3 px-4 text-center">
                       {/* Round 1: +X / -X tailored to active Sub-round (+20/-20, +30/-30, ..., +170/-170) */}
                       {state.currentRound === 1 && (
-                        <div className="inline-flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
                           <button
                             onClick={() => handleScoreChange(p.id, currentSubRound.points)}
                             title={`Add +${currentSubRound.points} pts`}
@@ -2028,6 +1992,40 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                           >
                             -{currentSubRound.points}
                           </button>
+
+                          {/* Quick manual score box */}
+                          <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg p-0.5">
+                            <input
+                              type="number"
+                              placeholder="pts"
+                              value={manualPointsMap[p.id] ?? ""}
+                              onChange={(e) => setManualPointsMap((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const val = Number(manualPointsMap[p.id]);
+                                  if (!isNaN(val)) {
+                                    handleDirectScoreSet(p.id, val);
+                                    setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                  }
+                                }
+                              }}
+                              className="w-14 bg-neutral-900 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val)) {
+                                  handleDirectScoreSet(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Set exact total score"
+                              className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              Set
+                            </button>
+                          </div>
                         </div>
                       )}
 
@@ -2038,87 +2036,343 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                         </span>
                       )}
 
-                      {/* Round 3 Root Master: +20 dan -5 */}
+                      {/* Round 3 Root Master: Manual Input Score + Quick Presets */}
                       {state.currentRound === 3 && (
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleScoreChange(p.id, 20)}
-                            title="Add +20 pts"
-                            className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
-                          >
-                            <Plus className="w-3 h-3" />+20
-                          </button>
+                        <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                          <div className="flex items-center gap-1 bg-black/40 border border-white/15 rounded-lg p-0.5">
+                            <input
+                              type="number"
+                              placeholder="Skor..."
+                              value={manualPointsMap[p.id] ?? ""}
+                              onChange={(e) => setManualPointsMap((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const val = Number(manualPointsMap[p.id]);
+                                  if (!isNaN(val)) {
+                                    handleDirectScoreSet(p.id, val);
+                                    setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                  }
+                                }
+                              }}
+                              className="w-16 bg-neutral-900 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val)) {
+                                  handleDirectScoreSet(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Set Total Score"
+                              className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 text-[10px] font-extrabold cursor-pointer transition-colors"
+                            >
+                              Set
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Add to score"
+                              className="px-1.5 py-0.5 rounded bg-[#8cc63f]/20 hover:bg-[#8cc63f]/40 text-[#8cc63f] text-[10px] font-extrabold cursor-pointer"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, -Math.abs(val));
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Deduct from score"
+                              className="px-1.5 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-extrabold cursor-pointer"
+                            >
+                              -
+                            </button>
+                          </div>
 
-                          <button
-                            onClick={() => handleScoreChange(p.id, -5)}
-                            title="Deduct -5 pts"
-                            className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-extrabold text-xs flex items-center gap-1 cursor-pointer"
-                          >
-                            -5
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, 20)}
+                              title="Quick Add +20"
+                              className="px-2 py-0.5 rounded bg-white/5 hover:bg-amber-400 hover:text-black text-amber-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              +20
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, -5)}
+                              title="Quick Deduct -5"
+                              className="px-2 py-0.5 rounded bg-white/5 hover:bg-red-500 hover:text-white text-red-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              -5
+                            </button>
+                          </div>
                         </div>
                       )}
 
-                      {/* Round 4 Sacred Handoff: +20 / -10 */}
+                      {/* Round 4 Sacred Handoff: Manual Input Score + Elimination */}
                       {state.currentRound === 4 && (
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleScoreChange(p.id, 20)}
-                            title="Add +20 pts"
-                            className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
-                          >
-                            <Plus className="w-3 h-3" />+20
-                          </button>
+                        <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                          <div className="flex items-center gap-1 bg-black/40 border border-white/15 rounded-lg p-0.5">
+                            <input
+                              type="number"
+                              placeholder="Skor..."
+                              value={manualPointsMap[p.id] ?? ""}
+                              onChange={(e) => setManualPointsMap((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const val = Number(manualPointsMap[p.id]);
+                                  if (!isNaN(val)) {
+                                    handleDirectScoreSet(p.id, val);
+                                    setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                  }
+                                }
+                              }}
+                              className="w-16 bg-neutral-900 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val)) {
+                                  handleDirectScoreSet(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Set Total Score"
+                              className="px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-extrabold cursor-pointer transition-colors"
+                            >
+                              Set
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Add to score"
+                              className="px-1.5 py-0.5 rounded bg-[#8cc63f]/20 hover:bg-[#8cc63f]/40 text-[#8cc63f] text-[10px] font-extrabold cursor-pointer"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, -Math.abs(val));
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Deduct from score"
+                              className="px-1.5 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-extrabold cursor-pointer"
+                            >
+                              -
+                            </button>
+                          </div>
 
-                          <button
-                            onClick={() => handleScoreChange(p.id, -10)}
-                            title="Deduct -10 pts"
-                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
-                          >
-                            -10
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, 20)}
+                              title="Quick Add +20"
+                              className="px-2 py-0.5 rounded bg-white/5 hover:bg-red-500 hover:text-white text-red-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              +20
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, -10)}
+                              title="Quick Deduct -10"
+                              className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/20 text-white/70 text-[10px] font-bold cursor-pointer"
+                            >
+                              -10
+                            </button>
+                          </div>
                         </div>
                       )}
 
-                      {/* Round 5 Pressure Chamber: Quick +/- 10 pts */}
+                      {/* Round 5 Pressure Chamber: Manual Input Score (Accumulated PTS) */}
                       {state.currentRound === 5 && (
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleScoreChange(p.id, 10)}
-                            title="Add +10 pts"
-                            className="px-2 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
-                          >
-                            <Plus className="w-3 h-3" />+10
-                          </button>
+                        <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                          <div className="flex items-center gap-1 bg-black/40 border border-purple-500/30 rounded-lg p-0.5">
+                            <input
+                              type="number"
+                              placeholder="Skor..."
+                              value={manualPointsMap[p.id] ?? ""}
+                              onChange={(e) => setManualPointsMap((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const val = Number(manualPointsMap[p.id]);
+                                  if (!isNaN(val)) {
+                                    handleDirectScoreSet(p.id, val);
+                                    setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                  }
+                                }
+                              }}
+                              className="w-16 bg-neutral-900 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val)) {
+                                  handleDirectScoreSet(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Set Total Score"
+                              className="px-2 py-0.5 rounded bg-purple-500/30 hover:bg-purple-500/50 text-purple-300 text-[10px] font-extrabold cursor-pointer transition-colors"
+                            >
+                              Set
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Add to score"
+                              className="px-1.5 py-0.5 rounded bg-[#8cc63f]/20 hover:bg-[#8cc63f]/40 text-[#8cc63f] text-[10px] font-extrabold cursor-pointer"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, -Math.abs(val));
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Deduct from score"
+                              className="px-1.5 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-extrabold cursor-pointer"
+                            >
+                              -
+                            </button>
+                          </div>
 
-                          <button
-                            onClick={() => handleScoreChange(p.id, -10)}
-                            title="Deduct -10 pts"
-                            className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-bold text-xs cursor-pointer"
-                          >
-                            -10
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, 10)}
+                              title="Quick Add +10"
+                              className="px-2 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500 hover:text-white text-purple-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              +10
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, -10)}
+                              title="Quick Deduct -10"
+                              className="px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              -10
+                            </button>
+                          </div>
                         </div>
                       )}
 
-                      {/* Round 6 Executive Pitch: Quick +/- 10 pts */}
+                      {/* Round 6 Executive Pitch: Manual Input Score */}
                       {state.currentRound === 6 && (
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleScoreChange(p.id, 10)}
-                            title="Add +10 pts"
-                            className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-sm"
-                          >
-                            <Plus className="w-3 h-3" />+10
-                          </button>
+                        <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                          <div className="flex items-center gap-1 bg-black/40 border border-amber-500/30 rounded-lg p-0.5">
+                            <input
+                              type="number"
+                              placeholder="Skor..."
+                              value={manualPointsMap[p.id] ?? ""}
+                              onChange={(e) => setManualPointsMap((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const val = Number(manualPointsMap[p.id]);
+                                  if (!isNaN(val)) {
+                                    handleDirectScoreSet(p.id, val);
+                                    setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                  }
+                                }
+                              }}
+                              className="w-16 bg-neutral-900 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val)) {
+                                  handleDirectScoreSet(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Set Total Score"
+                              className="px-2 py-0.5 rounded bg-amber-500/30 hover:bg-amber-500/50 text-amber-300 text-[10px] font-extrabold cursor-pointer transition-colors"
+                            >
+                              Set
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, val);
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Add to score"
+                              className="px-1.5 py-0.5 rounded bg-[#8cc63f]/20 hover:bg-[#8cc63f]/40 text-[#8cc63f] text-[10px] font-extrabold cursor-pointer"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = Number(manualPointsMap[p.id]);
+                                if (!isNaN(val) && val !== 0) {
+                                  handleScoreChange(p.id, -Math.abs(val));
+                                  setManualPointsMap((prev) => ({ ...prev, [p.id]: "" }));
+                                }
+                              }}
+                              title="Deduct from score"
+                              className="px-1.5 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-extrabold cursor-pointer"
+                            >
+                              -
+                            </button>
+                          </div>
 
-                          <button
-                            onClick={() => handleScoreChange(p.id, -10)}
-                            title="Deduct -10 pts"
-                            className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 font-bold text-xs cursor-pointer"
-                          >
-                            -10
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, 10)}
+                              title="Quick Add +10"
+                              className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500 hover:text-black text-amber-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              +10
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(p.id, -10)}
+                              title="Quick Deduct -10"
+                              className="px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              -10
+                            </button>
+                          </div>
                         </div>
                       )}
                     </td>

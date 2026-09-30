@@ -115,7 +115,7 @@ export const DEFAULT_PARTICIPANTS: Participant[] = [
   { id: "p-23", name: "Hanindita Fernanda Elsharini", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Hanindita Fernanda Elsharini"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
   { id: "p-24", name: "Kelvin William", university: "Universitas Ciputra", avatar: getParticipantPhoto("Kelvin William"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
   { id: "p-25", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Achmad Muchtarom Achsany"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
-  { id: "p-26", name: "Khalilullah Al-Faiz", university: "180 Degrees Consulting UB", avatar: getParticipantPhoto("Khalilullah Al-Faiz"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-26", name: "Faris Audah", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Faris Audah"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
 ];
 
 export function getSubRoundPointValue(subRoundIdx: number): number {
@@ -582,20 +582,31 @@ export const ROUND_ELIMINATIONS: Record<number, RoundEliminationConfig> = {
   },
 };
 
+export function isParticipantEliminated(p: Participant): boolean {
+  return p.eliminatedInRound !== undefined && p.eliminatedInRound !== null;
+}
+
+export function isParticipantActiveInRound(p: Participant, roundNum: number): boolean {
+  // If eliminated in any round strictly prior to roundNum (e.g. eliminated in R1, and we are in R2), they are NOT active
+  if (p.eliminatedInRound !== undefined && p.eliminatedInRound !== null && p.eliminatedInRound < roundNum) {
+    return false;
+  }
+  // If marked eliminated in the current round or status is eliminated, exclude
+  if (p.eliminatedInRound !== undefined && p.eliminatedInRound !== null && p.eliminatedInRound <= roundNum && p.status === "eliminated") {
+    return false;
+  }
+  // Golden ticket holders do not participate in Rounds 1-3
+  if (roundNum <= 3 && isGoldenTicket(p)) {
+    return false;
+  }
+  return true;
+}
+
 export function getActiveRoundParticipants(
   participants: Participant[],
   roundNum: number
 ): Participant[] {
-  if (roundNum <= 3) {
-    // Rounds 1-3: Non-golden ticket participants who haven't been eliminated
-    return participants.filter(
-      (p) => !isGoldenTicket(p) && (p.eliminatedInRound === undefined || p.eliminatedInRound === null)
-    );
-  }
-  // Round 4+: all participants who haven't been eliminated (including 3 Golden Ticket holders who join now!)
-  return participants.filter(
-    (p) => p.eliminatedInRound === undefined || p.eliminatedInRound === null
-  );
+  return participants.filter((p) => isParticipantActiveInRound(p, roundNum));
 }
 
 export function eliminateParticipant(
@@ -660,32 +671,39 @@ export function getInitialGameState(): GameState {
     subRoundIndex: 0,
     questionIndex: 0,
     round1Phase: "idle",
-    round1TimeRemainingMs: 30000,
+    round1TimeRemainingMs: 120000,
     round1TimerRunning: false,
 
     round2TargetAnswer: 1467,
     round2IsOpen: true,
+    round2ShowLeaderboard: false,
 
     round3TimeRemainingMs: 300000, // 5 minutes default
     round3TimerRunning: false,
     round3InitialMs: 300000,
+    round3ShowLeaderboard: false,
 
     round4SpinNames: top9Names,
     round4SelectedWinner: null,
     round4TimeRemainingMs: 300000,
     round4TimerRunning: false,
+    round4ShowLeaderboard: false,
 
     round5SpinNames: top9Names,
     round5SelectedWinner: null,
     round5TimeRemainingMs: 60000,
     round5TimerRunning: false,
     round5GameEnded: false,
+    round5ShowLeaderboard: false,
+    round5ViewMode: "wheel",
 
     round6SpinNames: top5Names,
     round6SelectedWinner: null,
     round6TimeRemainingMs: 180000,
     round6TimerRunning: false,
     round6GameEnded: false,
+    round6ShowLeaderboard: false,
+    round6ViewMode: "wheel",
 
     participants: DEFAULT_PARTICIPANTS,
     soundEnabled: true,
@@ -726,6 +744,40 @@ export function applyScoreChange(
   });
 }
 
+export function setManualScore(
+  participants: Participant[],
+  participantId: string,
+  newScore: number,
+  currentRound: number = 1
+): Participant[] {
+  return participants.map((p) => {
+    if (p.id === participantId) {
+      const clampedScore = Math.max(0, newScore);
+      const delta = clampedScore - p.score;
+      const roundScores = { ...(p.roundScores || {}) };
+      roundScores[currentRound] = Math.max(0, (roundScores[currentRound] || 0) + delta);
+
+      let point_gauntlet = p.point_gauntlet ?? (currentRound === 1 ? clampedScore : 0);
+      let point_rootmaster = p.point_rootmaster ?? (currentRound === 3 ? (roundScores[3] || 0) : 0);
+
+      if (currentRound === 1) {
+        point_gauntlet = clampedScore;
+      } else if (currentRound === 3) {
+        point_rootmaster = Math.max(0, point_rootmaster + delta);
+      }
+
+      return {
+        ...p,
+        score: clampedScore,
+        roundScores,
+        point_gauntlet,
+        point_rootmaster,
+      };
+    }
+    return p;
+  });
+}
+
 export function updateRound2Status(
   participants: Participant[],
   participantId: string,
@@ -733,7 +785,11 @@ export function updateRound2Status(
 ): Participant[] {
   return participants.map((p) => {
     if (p.id === participantId) {
-      return { ...p, round2Status: status };
+      return {
+        ...p,
+        round2Status: status,
+        passedAt: status === "passed" ? (p.passedAt || Date.now()) : undefined,
+      };
     }
     return p;
   });

@@ -5,7 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import confetti from "canvas-confetti";
 import { useGameState } from "../../../lib/useGameState.ts";
-import { validateRound2Answer, searchParticipants, getParticipantPhoto, getParticipantPhotoPosition } from "../../../lib/gameEngine.ts";
+import {
+  validateRound2Answer,
+  searchParticipants,
+  getParticipantPhoto,
+  getParticipantPhotoPosition,
+  getActiveRoundParticipants,
+} from "../../../lib/gameEngine.ts";
 import { playSuccessFanfare } from "../../../lib/audio.ts";
 import { Participant } from "../../../lib/types.ts";
 import {
@@ -52,7 +58,8 @@ export function InputRound2Client({ roomCode }: InputRound2ClientProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const recommendations = searchParticipants(gameState.participants, searchQuery);
+  const activeRound2Contenders = getActiveRoundParticipants(gameState.participants, 2);
+  const recommendations = searchParticipants(activeRound2Contenders, searchQuery);
 
   const handleSelectParticipant = (p: Participant) => {
     setSelectedParticipantId(p.id);
@@ -107,11 +114,17 @@ export function InputRound2Client({ roomCode }: InputRound2ClientProps) {
       setCelebrationCountdown(10);
       setShowCelebration(true);
 
+      const now = Date.now();
       const updatedParticipants = gameState.participants.map((p) =>
-        p.id === selectedParticipant.id ? { ...p, round2Status: "passed" as const } : p
+        p.id === selectedParticipant.id
+          ? { ...p, round2Status: "passed" as const, passedAt: p.passedAt || now }
+          : p
       );
       updateState({ participants: updatedParticipants });
     } else {
+      // Clear all inputs on incorrect answer
+      setSelectedParticipantId(null);
+      setSearchQuery("");
       setSubmissionError("Jawaban salah! Nilai valuasi tidak sesuai. Silakan hitung kembali dan coba lagi.");
     }
   };
