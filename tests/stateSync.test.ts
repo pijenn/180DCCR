@@ -19,7 +19,7 @@ describe("State Synchronization & Room Architecture", () => {
     assert.equal(state.round2TargetAnswer, 1467);
     assert.equal(state.round4SpinNames!.length, 9);
     assert.equal(state.round5SpinNames!.length, 9);
-    assert.equal(state.participants.length, 26);
+    assert.equal(state.participants.length, 25);
   });
 
   it("should merge partial state updates immutably", () => {
@@ -36,7 +36,7 @@ describe("State Synchronization & Room Architecture", () => {
 
     assert.equal(updated.currentRound, 2);
     assert.equal(updated.round2IsOpen, true);
-    assert.equal(updated.participants.length, 26);
+    assert.equal(updated.participants.length, 25);
     assert.equal(updated.lastUpdated, 123456789);
   });
 

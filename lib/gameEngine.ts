@@ -39,7 +39,6 @@ export const PARTICIPANT_PHOTO_MATCHERS = [
   { match: ["diva"], file: "Diva Salsabilla.jpeg" },
   { match: ["fachri"], file: "Fachri Fabian.jpeg" },
   { match: ["faris", "audah", "khalilullah", "faiz"], file: "Faris Audah.jpeg" },
-  { match: ["hanindita", "hanandita"], file: "Hanandita Fernanda Elsharini.JPG" },
   { match: ["hilmi"], file: "Hilmi Hidayat.webp" },
   { match: ["ihsan"], file: "Ihsan Dianta.jpeg" },
   { match: ["jesslyn"], file: "Jesslyn Callista.jpeg" },
@@ -112,10 +111,9 @@ export const DEFAULT_PARTICIPANTS: Participant[] = [
   { id: "p-20", name: "Nindya Aliyah Maulidina", university: "Universitas Pembangunan Nasional “Veteran” Jawa Timur", avatar: getParticipantPhoto("Nindya Aliyah Maulidina"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
   { id: "p-21", name: "Sharlyf Shaquille Syani", university: "Politeknik Negeri Malang", avatar: getParticipantPhoto("Sharlyf Shaquille Syani"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
   { id: "p-22", name: "Rexelnino Rajendra", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Rexelnino Rajendra"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
-  { id: "p-23", name: "Hanindita Fernanda Elsharini", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Hanindita Fernanda Elsharini"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
-  { id: "p-24", name: "Kelvin William", university: "Universitas Ciputra", avatar: getParticipantPhoto("Kelvin William"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
-  { id: "p-25", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Achmad Muchtarom Achsany"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
-  { id: "p-26", name: "Faris Audah", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Faris Audah"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-23", name: "Kelvin William", university: "Universitas Ciputra", avatar: getParticipantPhoto("Kelvin William"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-24", name: "Achmad Muchtarom Achsany", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Achmad Muchtarom Achsany"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
+  { id: "p-25", name: "Faris Audah", university: "Universitas Brawijaya", avatar: getParticipantPhoto("Faris Audah"), score: 0, point_gauntlet: 0, point_rootmaster: 0, round2Status: "pending", status: "active" },
 ];
 
 export function getSubRoundPointValue(subRoundIdx: number): number {
@@ -535,10 +533,10 @@ export const ROUND_ELIMINATIONS: Record<number, RoundEliminationConfig> = {
   1: {
     round: 1,
     name: "The Gauntlet",
-    startingCount: 23,
+    startingCount: 22,
     advancingCount: 18,
-    eliminatedCount: 5,
-    description: "23 Peserta Awal → 18 Peserta Lolos (5 Tereliminasi)",
+    eliminatedCount: 4,
+    description: "22 Peserta Awal → 18 Peserta Lolos (4 Tereliminasi)",
   },
   2: {
     round: 2,

@@ -47,8 +47,8 @@ describe("Game Engine - Round 1: The Gauntlet", () => {
 });
 
 describe("Game Engine - Participants & Leaderboard", () => {
-  it("should initialize exactly 26 participants with valid local avatars", () => {
-    assert.equal(DEFAULT_PARTICIPANTS.length, 26);
+  it("should initialize exactly 25 participants with valid local avatars", () => {
+    assert.equal(DEFAULT_PARTICIPANTS.length, 25);
     DEFAULT_PARTICIPANTS.forEach((p) => {
       assert.ok(p.id);
       assert.ok(p.name);

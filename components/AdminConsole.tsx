@@ -209,13 +209,13 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
   };
 
   const handleSeedSupabase = async () => {
-    if (!confirm(`Reset data 26 pemain ke default untuk Room '${effectiveRoom}'?`)) return;
+    if (!confirm(`Reset data 25 pemain ke default untuk Room '${effectiveRoom}'?`)) return;
     setIsSyncingDb(true);
     setDbNotice(null);
     try {
       const ok = await seedInitialPlayersToSupabase(effectiveRoom);
       if (ok) {
-        setDbNotice(`26 peserta Room '${effectiveRoom}' berhasil di-reset ke default!`);
+        setDbNotice(`25 peserta Room '${effectiveRoom}' berhasil di-reset ke default!`);
       } else {
         setDbNotice("Gagal reset data room.");
       }
@@ -230,9 +230,9 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
   const currentQuota = ROUND_ELIMINATIONS[state.currentRound] || {
     round: state.currentRound,
     name: `Round ${state.currentRound}`,
-    startingCount: 23,
+    startingCount: 22,
     advancingCount: 18,
-    eliminatedCount: 5,
+    eliminatedCount: 4,
     description: "Elimination quota",
   };
 
@@ -516,7 +516,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
               onClick={handleSyncToSupabase}
               disabled={isSyncingDb}
               className="px-4 py-2 rounded-xl bg-[#8cc63f]/15 hover:bg-[#8cc63f]/25 text-[#8cc63f] border border-[#8cc63f]/30 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
-              title="Simpan data seluruh 26 peserta ke tabel 'player' dan progress ke 'game_progress' Supabase"
+              title="Simpan data seluruh 25 peserta ke tabel 'player' dan progress ke 'game_progress' Supabase"
             >
               <Database className="w-3.5 h-3.5" />
               <span>{isSyncingDb ? "Menyimpan ke DB..." : "Sync ke Supabase"}</span>
@@ -563,7 +563,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
             {[
-              { num: 1, title: "The Gauntlet", desc: "23 → 18 Peserta" },
+              { num: 1, title: "The Gauntlet", desc: "22 → 18 Peserta" },
               { num: 2, title: "Capital Conquest", desc: "18 → 15 Peserta" },
               { num: 3, title: "Rootmaster", desc: "15 → 12 Peserta" },
               { num: 4, title: "Sacred Handoff", desc: "12 → 9 (Golden Ticket)" },
@@ -2418,7 +2418,7 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
                 className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reset 26 Pemain Room</span>
+                <span>Reset 25 Pemain Room</span>
               </button>
 
               <button

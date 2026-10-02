@@ -226,10 +226,10 @@ export function Round1Gauntlet({
   // In Round 1 (The Gauntlet), only non-golden-ticket regular participants compete
   const gauntletContenders = participants.filter((p) => !isGoldenTicket(p));
   const rankedGauntlet = calculateLeaderboard(
-    gauntletContenders.length > 0 ? gauntletContenders : participants.filter((p) => !isGoldenTicket(p)).slice(0, 23)
+    gauntletContenders.length > 0 ? gauntletContenders : participants.filter((p) => !isGoldenTicket(p)).slice(0, 22)
   );
   const top18 = rankedGauntlet.slice(0, 18);
-  const bottom5 = rankedGauntlet.slice(18, 23);
+  const bottom4 = rankedGauntlet.slice(18, 22);
 
   return (
     <div className="w-full h-full flex flex-col justify-between max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4 select-none animate-in fade-in duration-300 min-h-0 overflow-hidden">
@@ -523,7 +523,7 @@ export function Round1Gauntlet({
                     <Trophy className="w-4 h-4" /> Klasemen Akhir: {currentSubRound.name}
                   </span>
                   <span className="text-xs font-mono text-white/60 hidden sm:inline">
-                    23 Peserta The Gauntlet
+                    22 Peserta The Gauntlet
                   </span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase mt-1 font-sans">
@@ -538,12 +538,12 @@ export function Round1Gauntlet({
                   <span>Top 18 Lolos</span>
                 </div>
                 <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-mono font-bold">
-                  <span>5 Gugur</span>
+                  <span>4 Gugur</span>
                 </div>
               </div>
             </div>
 
-            {/* Split Arena: 18 Qualified (Cols 1-9) + 5 Danger Zone (Cols 10-12) */}
+            {/* Split Arena: 18 Qualified (Cols 1-9) + 4 Danger Zone (Cols 10-12) */}
             <div className="flex-1 grid grid-cols-12 gap-3.5 min-h-0 overflow-hidden">
               {/* TOP 18 QUALIFIED (COLUMNS 1 to 9) */}
               <div className="col-span-12 lg:col-span-9 flex flex-col min-h-0 h-full rounded-2xl bg-black/40 border border-white/10 p-2.5 sm:p-3 overflow-hidden">
@@ -552,7 +552,7 @@ export function Round1Gauntlet({
                     <span className="w-2.5 h-2.5 rounded-full bg-[#23D700] animate-pulse" />
                     Kualifikasi Lolos Capital Conquest (Peringkat 1 - 18)
                   </span>
-                  <span className="text-xs text-white/50 font-mono font-bold">18 / 23 PESERTA</span>
+                  <span className="text-xs text-white/50 font-mono font-bold">18 / 22 PESERTA</span>
                 </div>
 
                 {/* 3 Columns x 6 Rows Grid = Exactly 18 Contenders */}
@@ -625,7 +625,7 @@ export function Round1Gauntlet({
                 </div>
               </div>
 
-              {/* BOTTOM 5 ELIMINATION / DANGER ZONE (COLUMNS 10 to 12) */}
+              {/* BOTTOM 4 ELIMINATION / DANGER ZONE (COLUMNS 10 to 12) */}
               <div className="col-span-12 lg:col-span-3 flex flex-col justify-between min-h-0 h-full rounded-2xl bg-red-950/25 border-2 border-red-500/40 p-2.5 sm:p-3 overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.15)]">
                 <div className="px-1.5 pb-2 flex-shrink-0 border-b border-red-500/30 mb-1.5">
                   <div className="flex items-center justify-between">
@@ -633,17 +633,17 @@ export function Round1Gauntlet({
                       ⚠️ Zona Eliminasi
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-mono font-bold uppercase">
-                      5 Peserta
+                      4 Peserta
                     </span>
                   </div>
                   <div className="text-[10px] sm:text-xs font-mono text-red-300/70 mt-0.5">
-                    Peringkat 19 - 23 • Belum Lolos
+                    Peringkat 19 - 22 • Belum Lolos
                   </div>
                 </div>
 
-                {/* 5 Compact Cards */}
+                {/* 4 Compact Cards */}
                 <div className="flex-1 flex flex-col justify-between gap-1.5 min-h-0 py-0.5">
-                  {bottom5.map((p, idx) => {
+                  {bottom4.map((p, idx) => {
                     const rank = 19 + idx;
                     return (
                       <div
