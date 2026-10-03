@@ -23,6 +23,9 @@ import {
   getActiveRoundParticipants,
   isParticipantActiveInRound,
   isParticipantEliminated,
+  getRound3Leaderboard,
+  reorderRound3Participant,
+  setRound3ParticipantRank,
 } from "../lib/gameEngine.ts";
 import {
   Search,
@@ -44,6 +47,11 @@ import {
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
+  ChevronUp,
+  ChevronDown,
+  ArrowUp,
+  ArrowDown,
+  ListOrdered,
   ExternalLink,
   HelpCircle,
   Ticket,
@@ -996,119 +1004,360 @@ export function AdminConsole({ state, onUpdateState, roomCode }: AdminConsolePro
       )}
 
       {/* Round 3 Admin Controls */}
-      {state.currentRound === 3 && (
-        <div className="glass-panel p-6 rounded-3xl border-white/10 space-y-4">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
-            <div>
-              <h2 className="text-lg font-black text-white uppercase flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-400" />
-                Round 3: Rootmaster Stage Timer & Scoring
-              </h2>
-              <p className="text-xs text-white/50">
-                Atur countdown Rootmaster dan toggle klasemen stage. Penilaian skor menggunakan input manual.
-              </p>
-            </div>
+      {state.currentRound === 3 && (() => {
+        const rootmasterContenders = getActiveRoundParticipants(state.participants, 3);
+        const rankedContenders = getRound3Leaderboard(rootmasterContenders, state.round3CustomRanking);
+        const top12Contenders = rankedContenders.slice(0, 12);
+        const dangerContenders = rankedContenders.slice(12);
 
-            {/* Stage Leaderboard Toggle & Custom Timer Controls */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdateState({ round3ShowLeaderboard: !state.round3ShowLeaderboard })
-                }
-                className={`px-4 py-2 rounded-xl font-bold text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-                  state.round3ShowLeaderboard
-                    ? "bg-amber-500 text-black border border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
-                    : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
-                }`}
-              >
-                <Trophy className="w-3.5 h-3.5 text-amber-300" />
-                <span>
-                  {state.round3ShowLeaderboard
-                    ? "Layar Stage: LEADERBOARD AKTIF"
-                    : "Tampilkan Leaderboard di Stage"}
-                </span>
-              </button>
+        const handleReorderR3 = (participantId: string, direction: "up" | "down") => {
+          const currentOrder = rankedContenders.map((p) => p.id);
+          const newOrder = reorderRound3Participant(currentOrder, participantId, direction);
+          onUpdateState({ round3CustomRanking: newOrder });
+        };
 
-              <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
-                <span className="text-[10px] text-white/50 uppercase font-bold">Timer:</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={customTimerR3Min}
-                  onChange={(e) => setCustomTimerR3Min(e.target.value)}
-                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
-                />
-                <span className="text-[10px] text-white/50 font-bold">m</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={customTimerR3Sec}
-                  onChange={(e) => setCustomTimerR3Sec(e.target.value)}
-                  className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
-                />
-                <span className="text-[10px] text-white/50 font-bold">s</span>
+        const handleSetRankR3 = (participantId: string, targetRank: number) => {
+          const currentOrder = rankedContenders.map((p) => p.id);
+          const newOrder = setRound3ParticipantRank(currentOrder, participantId, targetRank);
+          onUpdateState({ round3CustomRanking: newOrder });
+        };
+
+        const handleResetToScoreOrder = () => {
+          if (confirm("Urutkan ulang peserta Rootmaster otomatis berdasarkan skor tertinggi ke terendah?")) {
+            const scoreSorted = [...rootmasterContenders]
+              .sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return a.name.localeCompare(b.name);
+              })
+              .map((p) => p.id);
+            onUpdateState({ round3CustomRanking: scoreSorted });
+          }
+        };
+
+        const handleApplyRound3Eliminations = () => {
+          if (
+            confirm(
+              `Terapkan eliminasi Round 3 berdasarkan susunan ranking ini? Top 12 (Peringkat 1-12) akan dinyatakan LOLOS, dan Peringkat 13+ (${dangerContenders.length} peserta) akan TERELIMINASI.`
+            )
+          ) {
+            const top12Ids = new Set(top12Contenders.map((p) => p.id));
+            const dangerIds = new Set(dangerContenders.map((p) => p.id));
+            const updated = state.participants.map((p) => {
+              if (top12Ids.has(p.id)) {
+                return { ...p, status: "active" as const, eliminatedInRound: null };
+              }
+              if (dangerIds.has(p.id)) {
+                return { ...p, status: "eliminated" as const, eliminatedInRound: 3 };
+              }
+              return p;
+            });
+            onUpdateState({ participants: updated });
+          }
+        };
+
+        return (
+          <div className="glass-panel p-6 rounded-3xl border-amber-500/30 space-y-6">
+            {/* Header & Stage Timer / Leaderboard controls */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <ListOrdered className="w-3.5 h-3.5" />
+                    Round 3: Rootmaster Controller
+                  </span>
+                  <span className="text-xs text-white/50">{rootmasterContenders.length} Kontender Aktif</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-white uppercase mt-1 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-amber-400" />
+                  Rootmaster Stage Timer & Manual Ranking
+                </h2>
+                <p className="text-xs text-white/60">
+                  Ranking dapat diatur manual tanpa harus mengikuti score. Urutan ini langsung tampil pada layar Stage leaderboard.
+                </p>
+              </div>
+
+              {/* Stage Leaderboard Toggle & Custom Timer Controls */}
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
+                  onClick={() =>
+                    onUpdateState({ round3ShowLeaderboard: !state.round3ShowLeaderboard })
+                  }
+                  className={`px-4 py-2 rounded-xl font-bold text-xs uppercase flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+                    state.round3ShowLeaderboard
+                      ? "bg-amber-500 text-black border border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.4)]"
+                      : "bg-white/10 hover:bg-white/20 text-white/80 border border-white/20"
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5 text-amber-300" />
+                  <span>
+                    {state.round3ShowLeaderboard
+                      ? "Layar Stage: LEADERBOARD AKTIF"
+                      : "Tampilkan Leaderboard di Stage"}
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl">
+                  <span className="text-[10px] text-white/50 uppercase font-bold">Timer:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={customTimerR3Min}
+                    onChange={(e) => setCustomTimerR3Min(e.target.value)}
+                    className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                  />
+                  <span className="text-[10px] text-white/50 font-bold">m</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={customTimerR3Sec}
+                    onChange={(e) => setCustomTimerR3Sec(e.target.value)}
+                    className="w-10 bg-neutral-900 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white font-mono font-bold text-center"
+                  />
+                  <span className="text-[10px] text-white/50 font-bold">s</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const min = parseInt(customTimerR3Min, 10) || 0;
+                      const sec = parseInt(customTimerR3Sec, 10) || 0;
+                      const ms = Math.max(1000, (min * 60 + sec) * 1000);
+                      handleSetRound3Timer(ms);
+                    }}
+                    className="px-2.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 text-[10px] font-bold cursor-pointer transition-colors"
+                  >
+                    Set
+                  </button>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1 text-[10px]">
+                  {[
+                    { label: "3m", ms: 180000, m: "3", s: "0" },
+                    { label: "5m", ms: 300000, m: "5", s: "0" },
+                    { label: "10m", ms: 600000, m: "10", s: "0" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        setCustomTimerR3Min(preset.m);
+                        setCustomTimerR3Sec(preset.s);
+                        handleSetRound3Timer(preset.ms);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => onUpdateState({ round3TimerRunning: !state.round3TimerRunning })}
+                  className="px-4 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(140,198,63,0.3)] cursor-pointer"
+                >
+                  {state.round3TimerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-black" />}
+                  {state.round3TimerRunning ? "Pause Timer" : "Start Timer"}
+                </button>
+
+                <button
                   onClick={() => {
-                    const min = parseInt(customTimerR3Min, 10) || 0;
+                    const min = parseInt(customTimerR3Min, 10) || 5;
                     const sec = parseInt(customTimerR3Sec, 10) || 0;
                     const ms = Math.max(1000, (min * 60 + sec) * 1000);
                     handleSetRound3Timer(ms);
                   }}
-                  className="px-2.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 text-[10px] font-bold cursor-pointer transition-colors"
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
                 >
-                  Set
+                  <RotateCcw className="w-4 h-4" /> Reset
                 </button>
               </div>
+            </div>
 
-              {/* Quick Presets */}
-              <div className="flex items-center gap-1 text-[10px]">
-                {[
-                  { label: "3m", ms: 180000, m: "3", s: "0" },
-                  { label: "5m", ms: 300000, m: "5", s: "0" },
-                  { label: "10m", ms: 600000, m: "10", s: "0" },
-                ].map((preset) => (
+            {/* MANUAL RANKING MANAGER ARENA */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-black uppercase text-amber-300 tracking-wider flex items-center gap-2">
+                    <ListOrdered className="w-4 h-4" />
+                    Atur Urutan Ranking Rootmaster (Manual Order)
+                  </h3>
+                  <p className="text-xs text-white/50">
+                    Gunakan tombol <strong className="text-white">▲ Naik / ▼ Turun</strong> atau dropdown nomor peringkat untuk memindahkan peserta ke posisi yang diinginkan.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    key={preset.label}
                     type="button"
-                    onClick={() => {
-                      setCustomTimerR3Min(preset.m);
-                      setCustomTimerR3Sec(preset.s);
-                      handleSetRound3Timer(preset.ms);
-                    }}
-                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 text-[10px] font-mono font-bold cursor-pointer"
+                    onClick={handleResetToScoreOrder}
+                    className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Urutkan kembali berdasarkan total score tertinggi ke terendah"
                   >
-                    {preset.label}
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Reset ke Urutan Skor</span>
                   </button>
-                ))}
+
+                  <button
+                    type="button"
+                    onClick={handleApplyRound3Eliminations}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                    title="Otomatis loloskan Top 12 dan eliminasi peringkat 13 ke bawah"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Terapkan Eliminasi (Top 12 Lolos)</span>
+                  </button>
+                </div>
               </div>
 
-              <button
-                onClick={() => onUpdateState({ round3TimerRunning: !state.round3TimerRunning })}
-                className="px-4 py-2 rounded-xl bg-[#8cc63f] hover:bg-[#9de047] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-[0_0_15px_rgba(140,198,63,0.3)] cursor-pointer"
-              >
-                {state.round3TimerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-black" />}
-                {state.round3TimerRunning ? "Pause Timer" : "Start Timer"}
-              </button>
+              {/* Contenders Table with Reordering */}
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-white/5 border-b border-white/10 uppercase tracking-wider text-white/60 font-black">
+                      <th className="py-2.5 px-3 text-center w-16">Peringkat</th>
+                      <th className="py-2.5 px-3">Peserta & Kampus</th>
+                      <th className="py-2.5 px-3 text-center w-28">Status Kelolosan</th>
+                      <th className="py-2.5 px-3 text-right w-28">Total Skor</th>
+                      <th className="py-2.5 px-3 text-center w-64">Atur Urutan Ranking</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {rankedContenders.map((p, idx) => {
+                      const rank = idx + 1;
+                      const isTop12 = rank <= 12;
+                      const isGold = rank === 1;
+                      const isSilver = rank === 2;
+                      const isBronze = rank === 3;
+                      const isFirst = idx === 0;
+                      const isLast = idx === rankedContenders.length - 1;
 
-              <button
-                onClick={() => {
-                  const min = parseInt(customTimerR3Min, 10) || 5;
-                  const sec = parseInt(customTimerR3Sec, 10) || 0;
-                  const ms = Math.max(1000, (min * 60 + sec) * 1000);
-                  handleSetRound3Timer(ms);
-                }}
-                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" /> Reset
-              </button>
+                      return (
+                        <tr
+                          key={p.id}
+                          className={`transition-colors ${
+                            !isTop12
+                              ? "bg-red-950/20 hover:bg-red-950/30"
+                              : isGold
+                              ? "bg-amber-500/10 hover:bg-amber-500/15"
+                              : "hover:bg-white/[0.02]"
+                          }`}
+                        >
+                          {/* Rank Badge */}
+                          <td className="py-2.5 px-3 text-center">
+                            <span
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded-lg font-mono font-black text-xs ${
+                                isGold
+                                  ? "bg-amber-400 text-black shadow-md"
+                                  : isSilver
+                                  ? "bg-slate-200 text-black shadow-md"
+                                  : isBronze
+                                  ? "bg-amber-600 text-white shadow-md"
+                                  : isTop12
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                  : "bg-red-500/30 text-red-300 border border-red-500/40"
+                              }`}
+                            >
+                              {rank}
+                            </span>
+                          </td>
+
+                          {/* Avatar & Name */}
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/20 flex-shrink-0 bg-neutral-900">
+                                <Image
+                                  src={p.avatar || getParticipantPhoto(p.name)}
+                                  alt={p.name}
+                                  fill
+                                  sizes="32px"
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-white text-xs sm:text-sm truncate">
+                                  {p.name}
+                                </div>
+                                <div className="text-[10px] text-white/50 truncate font-mono">
+                                  {p.university}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Qualified / Danger Status */}
+                          <td className="py-2.5 px-3 text-center">
+                            {isTop12 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                <Check className="w-2.5 h-2.5" /> Lolos Top 12
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/40">
+                                <UserX className="w-2.5 h-2.5" /> Zona Eliminasi
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Score with direct edit */}
+                          <td className="py-2.5 px-3 text-right font-mono">
+                            <div className="font-black text-sm text-amber-300">
+                              {p.score.toLocaleString()} <span className="text-[9px] text-white/40 uppercase">PTS</span>
+                            </div>
+                          </td>
+
+                          {/* Manual Order Controls (Up, Down, Rank Selector) */}
+                          <td className="py-2.5 px-3 text-center">
+                            <div className="inline-flex items-center justify-center gap-1.5">
+                              {/* Move Up */}
+                              <button
+                                type="button"
+                                disabled={isFirst}
+                                onClick={() => handleReorderR3(p.id, "up")}
+                                title="Naikkan 1 peringkat ke atas"
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-amber-500/20 text-white/70 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-white/5 disabled:hover:text-white/70 transition-colors cursor-pointer border border-white/10"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Move Down */}
+                              <button
+                                type="button"
+                                disabled={isLast}
+                                onClick={() => handleReorderR3(p.id, "down")}
+                                title="Turunkan 1 peringkat ke bawah"
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-amber-500/20 text-white/70 hover:text-amber-300 disabled:opacity-20 disabled:hover:bg-white/5 disabled:hover:text-white/70 transition-colors cursor-pointer border border-white/10"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Direct Rank Dropdown */}
+                              <div className="flex items-center gap-1 bg-black/60 border border-white/15 rounded-lg px-2 py-1">
+                                <span className="text-[10px] text-white/40 uppercase font-bold">Posisi:</span>
+                                <select
+                                  value={rank}
+                                  onChange={(e) => handleSetRankR3(p.id, parseInt(e.target.value, 10))}
+                                  className="bg-neutral-900 text-amber-300 font-mono font-bold text-xs rounded px-1.5 py-0.5 border border-white/20 cursor-pointer focus:outline-none focus:border-amber-400"
+                                >
+                                  {rankedContenders.map((_, rIdx) => (
+                                    <option key={rIdx + 1} value={rIdx + 1}>
+                                      #{rIdx + 1} {rIdx + 1 <= 12 ? "(Lolos)" : "(Gugur)"}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Round 4 Admin Controls (Sacred Handoff: 12 -> 9) */}
       {state.currentRound === 4 && (

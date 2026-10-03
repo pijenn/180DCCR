@@ -365,6 +365,7 @@ export function StageArena({ roomCode }: StageArenaProps) {
               timerRunning={gameState.round3TimerRunning}
               soundEnabled={gameState.soundEnabled}
               showLeaderboard={gameState.round3ShowLeaderboard || false}
+              customRanking={gameState.round3CustomRanking}
               onToggleLeaderboard={() =>
                 updateState({ round3ShowLeaderboard: !gameState.round3ShowLeaderboard })
               }

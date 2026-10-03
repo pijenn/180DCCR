@@ -135,6 +135,86 @@ export function calculateLeaderboard(participants: Participant[]): (Participant 
   }));
 }
 
+/**
+ * Calculate Round 3 Rootmaster Leaderboard with support for manual ranking order.
+ * If customRankingOrder is provided (array of participant IDs in order), it ranks them by that order.
+ * Otherwise, if participants have round3Rank, ranks by that.
+ * Otherwise, falls back to calculateLeaderboard (score descending).
+ */
+export function getRound3Leaderboard(
+  participants: Participant[],
+  customRankingOrder?: string[]
+): (Participant & { rank: number })[] {
+  if (customRankingOrder && customRankingOrder.length > 0) {
+    const idOrderMap = new Map<string, number>();
+    customRankingOrder.forEach((id, idx) => idOrderMap.set(id, idx));
+
+    const sorted = [...participants].sort((a, b) => {
+      const orderA = idOrderMap.has(a.id) ? idOrderMap.get(a.id)! : 9999;
+      const orderB = idOrderMap.has(b.id) ? idOrderMap.get(b.id)! : 9999;
+      if (orderA !== orderB) return orderA - orderB;
+      if (b.score !== a.score) return b.score - a.score;
+      return a.name.localeCompare(b.name);
+    });
+
+    return sorted.map((p, index) => ({
+      ...p,
+      rank: index + 1,
+    }));
+  }
+
+  const hasManualRanks = participants.some((p) => typeof p.round3Rank === "number" && p.round3Rank !== null);
+  if (hasManualRanks) {
+    const sorted = [...participants].sort((a, b) => {
+      const rankA = typeof a.round3Rank === "number" && a.round3Rank !== null ? a.round3Rank : 9999;
+      const rankB = typeof b.round3Rank === "number" && b.round3Rank !== null ? b.round3Rank : 9999;
+      if (rankA !== rankB) return rankA - rankB;
+      if (b.score !== a.score) return b.score - a.score;
+      return a.name.localeCompare(b.name);
+    });
+
+    return sorted.map((p, index) => ({
+      ...p,
+      rank: index + 1,
+    }));
+  }
+
+  return calculateLeaderboard(participants);
+}
+
+export function reorderRound3Participant(
+  currentOrder: string[],
+  participantId: string,
+  direction: "up" | "down"
+): string[] {
+  const index = currentOrder.indexOf(participantId);
+  if (index === -1) return currentOrder;
+  if (direction === "up" && index === 0) return currentOrder;
+  if (direction === "down" && index === currentOrder.length - 1) return currentOrder;
+
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  const newOrder = [...currentOrder];
+  const [removed] = newOrder.splice(index, 1);
+  newOrder.splice(targetIndex, 0, removed);
+  return newOrder;
+}
+
+export function setRound3ParticipantRank(
+  currentOrder: string[],
+  participantId: string,
+  targetRank1Indexed: number
+): string[] {
+  const index = currentOrder.indexOf(participantId);
+  if (index === -1) return currentOrder;
+  const targetIndex = Math.max(0, Math.min(currentOrder.length - 1, targetRank1Indexed - 1));
+  if (index === targetIndex) return currentOrder;
+
+  const newOrder = [...currentOrder];
+  const [removed] = newOrder.splice(index, 1);
+  newOrder.splice(targetIndex, 0, removed);
+  return newOrder;
+}
+
 export function validateRound2Answer(input: string | number, target: number = 1467): boolean {
   if (typeof input === "string") {
     const trimmed = input.trim();
@@ -680,6 +760,7 @@ export function getInitialGameState(): GameState {
     round3TimerRunning: false,
     round3InitialMs: 300000,
     round3ShowLeaderboard: false,
+    round3CustomRanking: [],
 
     round4SpinNames: top9Names,
     round4SelectedWinner: null,

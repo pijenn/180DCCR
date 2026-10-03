@@ -25,6 +25,7 @@ export interface Participant {
   point_rootmaster?: number;
   pressureRubric?: PressureRubric;
   passedAt?: number;
+  round3Rank?: number | null;
 }
 
 export interface PlayerRecord {
@@ -40,6 +41,7 @@ export interface PlayerRecord {
   round2_status?: string;
   eliminated_in_round?: number | null;
   passed_at?: number;
+  round3_rank?: number | null;
 }
 
 export interface SubRoundConfig {
@@ -95,6 +97,7 @@ export interface GameState {
   round3InitialMs: number;
   round3TimerEndAt?: number | null;
   round3ShowLeaderboard?: boolean;
+  round3CustomRanking?: string[]; // Array of participant IDs in manual rank order
 
   // Round 4 state (Sacred Handoff)
   round4TimeRemainingMs: number;

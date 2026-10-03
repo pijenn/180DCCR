@@ -6,6 +6,7 @@ import { Participant } from "../lib/types.ts";
 import {
   formatPrecisionCountdown,
   calculateLeaderboard,
+  getRound3Leaderboard,
   isGoldenTicket,
   getParticipantPhoto,
   getParticipantPhotoPosition,
@@ -21,6 +22,7 @@ interface Round3RootmasterProps {
   soundEnabled?: boolean;
   isAdmin?: boolean;
   showLeaderboard?: boolean;
+  customRanking?: string[];
   onToggleLeaderboard?: () => void;
   onStart?: () => void;
   onPause?: () => void;
@@ -35,6 +37,7 @@ export function Round3Rootmaster({
   soundEnabled = true,
   isAdmin = false,
   showLeaderboard = false,
+  customRanking,
   onToggleLeaderboard,
   onStart,
   onPause,
@@ -68,7 +71,7 @@ export function Round3Rootmaster({
   // Active contenders in Round 3 (non-golden-ticket, active / not eliminated in earlier rounds)
   const rootmasterParticipants = getActiveRoundParticipants(participants, 3);
 
-  const rankedRootmaster = calculateLeaderboard(rootmasterParticipants);
+  const rankedRootmaster = getRound3Leaderboard(rootmasterParticipants, customRanking);
   const top12 = rankedRootmaster.slice(0, 12);
   const dangerZone = rankedRootmaster.slice(12);
 

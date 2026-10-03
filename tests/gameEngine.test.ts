@@ -4,6 +4,9 @@ import {
   ROUND_1_SUBROUNDS,
   DEFAULT_PARTICIPANTS,
   calculateLeaderboard,
+  getRound3Leaderboard,
+  reorderRound3Participant,
+  setRound3ParticipantRank,
   validateRound2Answer,
   formatTimerDisplay,
   formatPrecisionCountdown,
@@ -82,6 +85,44 @@ describe("Game Engine - Participants & Leaderboard", () => {
     assert.equal(ranked[1].rank, 2);
     assert.equal(ranked[2].name, "Alice");
     assert.equal(ranked[2].rank, 3);
+  });
+});
+
+describe("Game Engine - Round 3: Rootmaster Manual Ranking", () => {
+  it("should respect customRanking order regardless of scores", () => {
+    const participants = [
+      { id: "p-01", name: "Alice", university: "Univ A", score: 500, avatar: "/participants/default-avatar.svg", round2Status: "passed" as const },
+      { id: "p-02", name: "Bob", university: "Univ B", score: 100, avatar: "/participants/default-avatar.svg", round2Status: "passed" as const },
+      { id: "p-03", name: "Charlie", university: "Univ C", score: 300, avatar: "/participants/default-avatar.svg", round2Status: "passed" as const },
+    ];
+
+    // Score order would be: Alice (500), Charlie (300), Bob (100)
+    // Custom ranking puts Bob first, then Alice, then Charlie
+    const customOrder = ["p-02", "p-01", "p-03"];
+    const ranked = getRound3Leaderboard(participants, customOrder);
+
+    assert.equal(ranked[0].name, "Bob");
+    assert.equal(ranked[0].rank, 1);
+    assert.equal(ranked[1].name, "Alice");
+    assert.equal(ranked[1].rank, 2);
+    assert.equal(ranked[2].name, "Charlie");
+    assert.equal(ranked[2].rank, 3);
+  });
+
+  it("should reorder participant positions up and down correctly", () => {
+    const list = ["p-01", "p-02", "p-03", "p-04"];
+
+    // Move p-03 up -> should become ["p-01", "p-03", "p-02", "p-04"]
+    const movedUp = reorderRound3Participant(list, "p-03", "up");
+    assert.deepEqual(movedUp, ["p-01", "p-03", "p-02", "p-04"]);
+
+    // Move p-01 down -> should become ["p-03", "p-01", "p-02", "p-04"]
+    const movedDown = reorderRound3Participant(movedUp, "p-01", "down");
+    assert.deepEqual(movedDown, ["p-03", "p-01", "p-02", "p-04"]);
+
+    // Set rank directly: move p-04 to rank 1 (index 0)
+    const setRank1 = setRound3ParticipantRank(movedDown, "p-04", 1);
+    assert.deepEqual(setRank1, ["p-04", "p-03", "p-01", "p-02"]);
   });
 });
 
